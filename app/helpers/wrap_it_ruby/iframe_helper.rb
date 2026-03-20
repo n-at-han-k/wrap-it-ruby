@@ -1,8 +1,6 @@
-# frozen_string_literal: true
-
 module WrapItRuby
   module IframeHelper
-    def iframe(**)
+    def iframe_wrapper(**)
       tag.div(class: "iframe-wrapper") do
         tag.iframe(**)
       end

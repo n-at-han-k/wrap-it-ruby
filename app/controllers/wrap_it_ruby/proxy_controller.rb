@@ -2,6 +2,9 @@
 
 module WrapItRuby
   class ProxyController < ::ApplicationController
+    include WrapItRuby::MenuHelper
+    include WrapItRuby::IframeHelper
+
     def show
       get_menu_item.then do |menu_item|
         target_path   = request.path.delete_prefix(menu_item["route"])

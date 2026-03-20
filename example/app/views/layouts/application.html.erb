@@ -21,7 +21,7 @@
 
   <body>
     <div id="site-wrapper">
-      <div id="site-menu"><%= render "shared/navbar" %></div>
+      <div id="site-menu"><%= WrapItRuby::MenuHelper.render %></div>
       <div id="site-content"><%= yield %></div>
     </div>
   </body>
