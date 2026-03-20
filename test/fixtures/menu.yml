@@ -1,0 +1,22 @@
+- label: Dashboard
+  route: /dashboard
+  url: dashboard.example.com
+  icon: chart
+  type: proxy
+
+- label: Docs
+  route: /docs
+  url: docs.example.com
+  icon: book
+  type: proxy
+  items:
+    - label: API
+      route: /docs/api
+      url: api.example.com
+      icon: code
+      type: proxy
+
+- label: About
+  route: /about
+  icon: info
+  type: link

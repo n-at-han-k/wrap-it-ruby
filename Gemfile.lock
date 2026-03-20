@@ -295,6 +295,7 @@ PLATFORMS
 
 DEPENDENCIES
   debug
+  rails
   rails-active-ui!
   wrap_it_ruby!
 

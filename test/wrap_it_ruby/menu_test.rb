@@ -1,0 +1,61 @@
+# frozen_string_literal: true
+
+require "test_helper"
+
+class WrapItRuby::MenuTest < Minitest::Test
+  FIXTURE_MENU = File.join(FIXTURES_PATH, "menu.yml")
+
+  def setup
+    WrapItRuby::Menu.instance_variable_set(:@menu_config, nil)
+    fixture = FIXTURE_MENU
+    WrapItRuby::Menu.define_method(:menu_file) { Pathname.new(fixture) }
+  end
+
+  def teardown
+    WrapItRuby::Menu.instance_variable_set(:@menu_config, nil)
+    WrapItRuby::Menu.define_method(:menu_file) { Rails.root.join("config/menu.yml") }
+  end
+
+  def test_menu_config_loads_yaml
+    config = WrapItRuby::Menu.menu_config
+    assert_kind_of Array, config
+    assert_equal 3, config.size
+    assert_equal "Dashboard", config[0]["label"]
+  end
+
+  def test_all_menu_items_flattens_nested_items
+    items = WrapItRuby::Menu.all_menu_items
+    labels = items.map { |i| i["label"] }
+
+    assert_includes labels, "Dashboard"
+    assert_includes labels, "Docs"
+    assert_includes labels, "API"
+    assert_includes labels, "About"
+    assert_equal 4, items.size
+  end
+
+  def test_all_proxy_menu_items_filters_by_type
+    proxy_items = WrapItRuby::Menu.all_proxy_menu_items
+    proxy_items.each do |item|
+      assert_equal "proxy", item["type"]
+    end
+    assert_equal 3, proxy_items.size
+  end
+
+  def test_proxy_paths_returns_routes
+    paths = WrapItRuby::Menu.proxy_paths
+    assert_includes paths, "/dashboard"
+    assert_includes paths, "/docs"
+    assert_includes paths, "/docs/api"
+    refute_includes paths, "/about"
+  end
+
+  def test_menu_is_includable
+    obj = Object.new
+    obj.extend(WrapItRuby::Menu)
+    fixture = FIXTURE_MENU
+    obj.define_singleton_method(:menu_file) { Pathname.new(fixture) }
+
+    assert_kind_of Array, obj.menu_config
+  end
+end
