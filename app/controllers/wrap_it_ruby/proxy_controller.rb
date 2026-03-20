@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module WrapItRuby
-  class ProxyController < ApplicationController
+  class ProxyController < ::ApplicationController
     def show
       get_menu_item.then do |menu_item|
         target_path   = request.path.delete_prefix(menu_item["route"])

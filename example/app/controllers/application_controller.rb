@@ -1,4 +1,6 @@
 class ApplicationController < ActionController::Base
+  include WrapItRuby::Menu
+
   private
 
     # Stub authentication for the example app.

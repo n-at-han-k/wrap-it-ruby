@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module WrapItRuby
-  class HomeController < ApplicationController
+  class HomeController < ::ApplicationController
     def index
     end
   end
