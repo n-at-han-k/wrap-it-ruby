@@ -8,7 +8,7 @@ GIT
 PATH
   remote: .
   specs:
-    wrap_it_ruby (0.1.0)
+    wrap_it_ruby (0.1.1)
       async-http
       async-websocket
       importmap-rails
