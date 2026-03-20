@@ -1,0 +1,7 @@
+#!/usr/bin/env ruby
+
+system("docker", "compose", "up", "-d", exception: true)
+
+at_exit { system("docker", "compose", "down") }
+
+exec "bundle", "exec", "falcon", "serve", *ARGV

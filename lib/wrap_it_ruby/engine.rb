@@ -35,6 +35,9 @@ module WrapItRuby
     initializer "wrap_it_ruby.assets" do |app|
       app.config.assets.paths << Engine.root.join("app/assets/javascripts")
       app.config.assets.paths << Engine.root.join("app/assets/stylesheets")
+
+      # rails-active-ui ships stylesheets.css directly in app/assets/
+      app.config.assets.paths << Ui::Engine.root.join("app/assets")
     end
 
     # Make engine helpers (MenuHelper, IframeHelper) available in host app views.

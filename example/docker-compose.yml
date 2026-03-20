@@ -1,0 +1,17 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: tradeportal_test
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports: ["5433:5432"]
+
+  lldap:
+    image: lldap/lldap:latest
+    environment:
+      LLDAP_JWT_SECRET: test-secret
+      LLDAP_LDAP_USER_PASS: test-password
+      LLDAP_LDAP_BASE_DN: dc=tradeportal,dc=test
+    ports:
+      - "3891:3890"
+      - "17170:17170"
