@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "ui"
 require "wrap_it_ruby/middleware/proxy_middleware"
 require "wrap_it_ruby/middleware/root_relative_proxy_middleware"
 require "wrap_it_ruby/middleware/script_injection_middleware"
@@ -34,6 +35,16 @@ module WrapItRuby
     initializer "wrap_it_ruby.assets" do |app|
       app.config.assets.paths << Engine.root.join("app/assets/javascripts")
       app.config.assets.paths << Engine.root.join("app/assets/stylesheets")
+    end
+
+    # Make engine helpers (MenuHelper, IframeHelper) available in host app views.
+    # MenuHelper#render_menu depends on ComponentHelper from rails-active-ui,
+    # which is already injected into ActionView by the Ui engine.
+    initializer "wrap_it_ruby.helpers" do
+      ActiveSupport.on_load(:action_view) do
+        include WrapItRuby::MenuHelper
+        include WrapItRuby::IframeHelper
+      end
     end
   end
 end

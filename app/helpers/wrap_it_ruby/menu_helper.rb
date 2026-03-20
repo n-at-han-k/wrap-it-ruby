@@ -6,10 +6,16 @@ module WrapItRuby
   #
   # Can be used as a module (extend self) or included in controllers/helpers.
   #
+  # The render_menu method requires the view context (ComponentHelper from
+  # rails-active-ui must be available), so call it from views/layouts, not
+  # as a bare module method.
+  #
   module MenuHelper
     def menu_config = load_menu
 
-    def render
+    # Renders the sidebar menu using rails-active-ui component helpers.
+    # Must be called from a view context where ComponentHelper is included.
+    def render_menu
       Menu(attached: true) {
         WrapItRuby::MenuHelper.menu_config.each do |group|
           if group["items"]

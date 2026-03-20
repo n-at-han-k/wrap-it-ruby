@@ -2,6 +2,6 @@
 
 WrapItRuby::Engine.routes.draw do
   get "/*path", to: "proxy#show", constraints: ->(req) {
-    WrapItRuby::Menu.proxy_paths.any? { |p| req.path.start_with?(p) }
+    WrapItRuby::MenuHelper.proxy_paths.any? { |p| req.path.start_with?(p) }
   }
 end
