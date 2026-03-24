@@ -7,4 +7,5 @@ Rails.application.configure do
   config.server_timing = true
   config.action_controller.perform_caching = false
   config.cache_store = :null_store
+  config.hosts.clear
 end
