@@ -28,16 +28,12 @@ module WrapItRuby
         WrapItRuby::MenuHelper.menu_config.each do |entry|
           render_menu_entry(entry, top_level: true)
         end
-        if database_menu_available?
-          MenuItem(position: 'right') do
-            concat tag.button(class: 'ui mini icon button', onclick: "$('#menu-settings-modal').modal('show')") {
-              tag.i(class: 'pencil icon')
-            }
-          end
+        MenuItem(position: 'right') do
+          concat tag.button(class: 'ui mini icon button', onclick: "$('#menu-settings-modal').modal('show')") {
+            tag.i(class: 'pencil icon')
+          }
         end
       end
-
-      return unless database_menu_available?
 
       concat tag.div(id: 'menu-settings-modal', class: 'ui large modal') {
         safe_join([
