@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require "async/http/client"
-require "async/http/endpoint"
+require 'async/http/client'
+require 'async/http/endpoint'
 
 module WrapItRuby
   module Middleware
@@ -9,16 +9,33 @@ module WrapItRuby
     # BEFORE the Rack adapter, proxying them directly at the HTTP protocol
     # level. This preserves the Upgrade/Connection headers that Rack strips.
     #
+    # Header strategy (whitelist → modify → add):
+    #   1. Whitelist — only forward known-safe headers to upstream
+    #   2. Modify   — rewrite origin to match upstream host
+    #   3. Add      — protocol and authority are set for the HTTP client
+    #
     # Must be inserted as Falcon middleware, not as Rack middleware.
     # For non-WebSocket requests, passes through to the Rack app.
     #
     class WebSocketProxy < Protocol::HTTP::Middleware
       PROXY_PATTERN = %r{\A/_proxy/(?<host>[^/]+)(?<path>/.*)?\z}
 
-      HOP_HEADERS = %w[
-        connection keep-alive proxy-authenticate proxy-authorization
-        te trailers transfer-encoding upgrade
-      ].freeze
+      # Headers whitelisted for WebSocket upgrade forwarding.
+      # Notably excludes: host (set via authority), upgrade/connection
+      # (set via protocol field), and all browser metadata headers.
+      WS_REQUEST_WHITELIST = %w[
+        accept-language
+        authorization
+        cache-control
+        cookie
+        origin
+        pragma
+        sec-websocket-extensions
+        sec-websocket-key
+        sec-websocket-protocol
+        sec-websocket-version
+        user-agent
+      ].to_set.freeze
 
       def initialize(app)
         super(app)
@@ -27,8 +44,8 @@ module WrapItRuby
 
       def call(request)
         if websocket?(request) && (match = PROXY_PATTERN.match(request.path))
-          host = match[:host].delete_suffix(".")
-          proxy_websocket(request, host)
+          host = match[:host].delete_suffix('.')
+          proxy_websocket(request, host, match)
         else
           super(request)
         end
@@ -38,52 +55,55 @@ module WrapItRuby
 
       def websocket?(request)
         # HTTP/2: protocol pseudo-header
-        if Array(request.protocol).any? { |p| p.casecmp?("websocket") }
-          return true
-        end
+        return true if Array(request.protocol).any? { |p| p.casecmp?('websocket') }
         # HTTP/1.1: Upgrade header
-        if upgrade = request.headers["upgrade"]
-          return Array(upgrade).any? { |u| u.casecmp?("websocket") }
+        if upgrade = request.headers['upgrade']
+          return Array(upgrade).any? { |u| u.casecmp?('websocket') }
         end
+
         false
       end
 
-      def proxy_websocket(request, host)
+      def proxy_websocket(request, host, match)
         # Strip /_proxy/{host} prefix from the path
-        match = PROXY_PATTERN.match(request.path)
-        request.path = match[:path] || "/"
+        request.path = match[:path] || '/'
 
-        # Rewrite authority/host to upstream — write_request adds host
-        # from authority automatically, so just delete it from headers.
-        request.authority = host
-        request.headers.delete("host")
+        # Build clean headers: whitelist → modify → add
+        clean = Protocol::HTTP::Headers.new
 
-        # Set protocol as string (not array) for write_upgrade_body,
-        # and remove upgrade/connection headers to avoid duplicates.
-        request.protocol = "websocket"
-        request.headers.delete("upgrade")
-        request.headers.delete("connection")
+        # 1. Whitelist
+        request.headers.each do |name, value|
+          next unless WS_REQUEST_WHITELIST.include?(name)
 
-        # Rewrite origin
-        if request.headers["origin"]
-          request.headers.delete("origin")
-          request.headers.add("origin", "https://#{host}")
+          clean.add(name, value)
         end
+
+        # 2. Modify: rewrite origin to match upstream
+        if clean['origin']
+          clean.delete('origin')
+          clean.add('origin', "https://#{host}")
+        end
+
+        # 3. Add: protocol and authority for the HTTP client.
+        #    - host is written by write_request from authority (not headers)
+        #    - upgrade/connection are written by write_upgrade_body from protocol
+        request.headers = clean
+        request.authority = host
+        request.protocol = 'websocket'
 
         client = client_for(host)
         client.call(request)
-      rescue => error
-        $stderr.puts "[ws-proxy] upstream error: #{error.class}: #{error.message}"
-        Protocol::HTTP::Response[502, {}, ["WebSocket proxy error: #{error.message}"]]
+      rescue StandardError => e
+        warn "[ws-proxy] upstream error: #{e.class}: #{e.message}"
+        Protocol::HTTP::Response[502, {}, ["WebSocket proxy error: #{e.message}"]]
       end
 
       def client_for(host)
-        # Force HTTP/1.1 — upstream (Traefik/code-server) returns 405
-        # for HTTP/2 WebSocket CONNECT but accepts HTTP/1.1 Upgrade.
+        # Force HTTP/1.1 — upstream (Traefik) doesn't support WS over
+        # HTTP/2 CONNECT, only HTTP/1.1 Upgrade.
         @clients[host] ||= Async::HTTP::Client.new(
           Async::HTTP::Endpoint.parse("https://#{host}",
-            alpn_protocols: Async::HTTP::Protocol::HTTP11.names
-          ),
+                                      alpn_protocols: Async::HTTP::Protocol::HTTP11.names),
           retries: 0
         )
       end
