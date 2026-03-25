@@ -36,6 +36,7 @@ module WrapItRuby
         if-unmodified-since
         pragma
         range
+        user-agent
         x-requested-with
       ].to_set.freeze
 
