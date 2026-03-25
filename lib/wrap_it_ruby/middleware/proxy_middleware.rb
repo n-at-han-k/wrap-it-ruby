@@ -99,8 +99,8 @@ module WrapItRuby
         client = client_for(host)
 
         query     = env['QUERY_STRING']
-        query     = deproxify_query(query) if query.present?
-        full_path = query.present? ? "#{path}?#{query}" : path
+        query     = deproxify_query(query) if query && !query.empty?
+        full_path = (query && !query.empty?) ? "#{path}?#{query}" : path
         headers   = build_request_headers(env, host)
         body      = read_body(env)
 
@@ -244,7 +244,7 @@ module WrapItRuby
         rescue StandardError
           nil
         end
-        body.present? ? Protocol::HTTP::Body::Buffered.wrap(body) : nil
+        (body && !body.empty?) ? Protocol::HTTP::Body::Buffered.wrap(body) : nil
       end
     end
   end
