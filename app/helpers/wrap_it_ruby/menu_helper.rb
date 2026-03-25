@@ -28,7 +28,7 @@ module WrapItRuby
         WrapItRuby::MenuHelper.menu_config.each do |entry|
           render_menu_entry(entry, top_level: true)
         end
-        if WrapItRuby.menu_item_class
+        if database_menu_available?
           MenuItem(position: 'right') do
             concat tag.button(class: 'ui mini icon button', onclick: "$('#menu-settings-modal').modal('show')") {
               tag.i(class: 'pencil icon')
@@ -37,7 +37,7 @@ module WrapItRuby
         end
       end
 
-      return unless WrapItRuby.menu_item_class
+      return unless database_menu_available?
 
       concat tag.div(id: 'menu-settings-modal', class: 'ui large modal') {
         safe_join([
@@ -111,15 +111,13 @@ module WrapItRuby
     end
 
     def database_menu_available?
-      WrapItRuby.menu_item_model&.table_exists? &&
-        WrapItRuby.menu_item_model.exists?
+      defined?(::MenuItem) && ::MenuItem.table_exists? && ::MenuItem.exists?
     rescue StandardError
       false
     end
 
     def load_menu_from_database
-      model = WrapItRuby.menu_item_model
-      model.roots.includes(children: :children).map { |item| item_to_hash(item) }
+      ::MenuItem.roots.includes(children: :children).map { |item| item_to_hash(item) }
     end
 
     def item_to_hash(item)
