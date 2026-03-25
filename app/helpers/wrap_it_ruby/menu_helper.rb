@@ -41,32 +41,15 @@ module WrapItRuby
 
       items = ::MenuItem.roots.includes(children: :children)
 
-      sortable_list = tag.div(
-        id: 'menu-settings-list',
-        data: {
-          controller: 'wrap-it-ruby--sortable',
-          "wrap-it-ruby--sortable-group-value": 'roots',
-          "sortable-parent-id": ''
-        }
-      ) do
-        safe_join(items.map do |item|
-          render(partial: 'wrap_it_ruby/menu_settings/menu_item', locals: { item: item })
-        end)
+      accordion_content = tag.div(class: 'ui styled fluid tree accordion', data: { controller: 'fui-accordion' }) do
+        safe_join(items.map { |group| render_accordion_group(group) })
       end
 
-      concat(tag.style do
-        '.menu-settings-modal .menu-item { display:flex; align-items:center; gap:0.5em; padding:0.6em 0.8em; background:white; border:1px solid rgba(34,36,38,0.15); border-radius:4px; margin-bottom:4px; } ' \
-        '.menu-settings-modal .drag-handle { cursor:grab; color:#999; } ' \
-        '.menu-settings-modal .route-label { margin-left:auto; color:#888; font-size:0.85em; } ' \
-        '.menu-settings-modal .children-container { margin-left:1.5em; padding:4px 0; min-height:8px; } ' \
-        '.menu-settings-modal .sortable-ghost { opacity:0.4; background:#f0f8ff; }'
-      end)
-
-      concat tag.div(id: 'menu-settings-modal', class: 'ui large modal menu-settings-modal') {
+      concat tag.div(id: 'menu-settings-modal', class: 'ui large modal') {
         safe_join([
                     tag.i(class: 'close icon'),
                     tag.div(class: 'header') { tag.i(class: 'bars icon') + ' Menu Settings' },
-                    tag.div(class: 'scrolling content') { sortable_list }
+                    tag.div(class: 'scrolling content') { accordion_content }
                   ])
       }
     end
@@ -114,6 +97,75 @@ module WrapItRuby
         end
       else
         MenuItem(href: entry['route'], icon: entry['icon']) { text entry['label'] }
+      end
+    end
+
+    # Renders one accordion group: a .title + .content pair.
+    # If children are groups themselves, nests another accordion inside.
+    def render_accordion_group(item)
+      title = tag.div(class: 'active title') do
+        icon = item.icon.present? ? tag.i(class: "#{item.icon} icon") : ''.html_safe
+        tag.i(class: 'dropdown icon') + icon + ' ' + item.label
+      end
+
+      content = tag.div(class: 'active content') do
+        if item.children.any?
+          # Check if any children are groups (have their own children)
+          has_sub_groups = item.children.any? { |c| c.children.any? }
+
+          if has_sub_groups
+            # Nested accordion for sub-groups
+            tag.div(class: 'accordion') do
+              safe_join(item.children.map do |child|
+                if child.children.any?
+                  render_accordion_group(child)
+                else
+                  render_accordion_leaf(child)
+                end
+              end)
+            end
+          else
+            # All children are leaves — render as form fields
+            safe_join(item.children.map { |child| render_accordion_leaf(child) })
+          end
+        end
+      end
+
+      safe_join([title, content])
+    end
+
+    # Renders a leaf menu item as an editable form row.
+    def render_accordion_leaf(item)
+      wrap_it_ruby.sort_menu_setting_path(item)
+      update_url = wrap_it_ruby.update_menu_setting_path(item)
+
+      tag.div(class: 'ui small form', style: 'margin-bottom:0.5em;') do
+        tag.div(class: 'fields', style: 'margin-bottom:0;align-items:center;') do
+          safe_join([
+                      tag.div(class: 'one wide field') do
+                        tag.i(class: 'grip vertical icon', style: 'cursor:grab;color:#999;margin-top:0.5em;')
+                      end,
+                      tag.div(class: 'two wide field') do
+                        tag.input(type: 'text', name: 'icon', value: item.icon, placeholder: 'icon',
+                                  data: { url: update_url })
+                      end,
+                      tag.div(class: 'four wide field') do
+                        tag.input(type: 'text', name: 'label', value: item.label, placeholder: 'Label',
+                                  data: { url: update_url })
+                      end,
+                      tag.div(class: 'four wide field') do
+                        tag.input(type: 'text', name: 'route', value: item.route, placeholder: '/route',
+                                  data: { url: update_url })
+                      end,
+                      tag.div(class: 'four wide field') do
+                        tag.input(type: 'text', name: 'url', value: item.url, placeholder: 'upstream url',
+                                  data: { url: update_url })
+                      end,
+                      tag.div(class: 'one wide field') do
+                        tag.i(class: 'trash icon', style: 'cursor:pointer;color:#db2828;margin-top:0.5em;')
+                      end
+                    ])
+        end
       end
     end
 

@@ -6,6 +6,12 @@ module WrapItRuby
       @menu_items = ::MenuItem.roots.includes(children: :children)
     end
 
+    def update
+      item = ::MenuItem.find(params[:id])
+      item.update!(params.permit(:label, :icon, :route, :url, :item_type))
+      head :no_content
+    end
+
     def sort
       item = ::MenuItem.find(params[:id])
 
