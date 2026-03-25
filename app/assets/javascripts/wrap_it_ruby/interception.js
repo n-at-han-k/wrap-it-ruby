@@ -49,7 +49,9 @@
     if (!link) return
 
     const raw = link.getAttribute('href')
-    const url = raw.startsWith('/') ? `/_proxy/${window.__proxyHost}${raw}` : rewriteUrl(raw)
+    const url = raw.startsWith('/_proxy/') ? raw
+      : raw.startsWith('/') ? `/_proxy/${window.__proxyHost}${raw}`
+      : rewriteUrl(raw)
 
     event.preventDefault()
     window.location.href = url
@@ -59,7 +61,9 @@
     event.preventDefault()
     const form = event.target
     const raw = form.getAttribute('action') || ''
-    const url = raw.startsWith('/') ? `/_proxy/${window.__proxyHost}${raw}` : rewriteUrl(raw)
+    const url = raw.startsWith('/_proxy/') ? raw
+      : raw.startsWith('/') ? `/_proxy/${window.__proxyHost}${raw}`
+      : rewriteUrl(raw)
 
     form.setAttribute('action', url)
     event.target.submit()
@@ -160,7 +164,9 @@
     } catch {
       // Relative URL — prefix with proxy host
       if (raw.startsWith('/')) {
-        return `wss://${window.__hostingSite}/_proxy/${PROXY_HOST}${raw}`
+        return raw.startsWith('/_proxy/')
+          ? `wss://${window.__hostingSite}${raw}`
+          : `wss://${window.__hostingSite}/_proxy/${PROXY_HOST}${raw}`
       }
       return raw
     }
@@ -183,7 +189,9 @@
   if (_EventSource) {
     window.EventSource = function (url, dict) {
       const raw = typeof url === 'string' ? url : url.href
-      const rewritten = raw.startsWith('/') ? `/_proxy/${PROXY_HOST}${raw}` : rewriteUrl(raw)
+      const rewritten = raw.startsWith('/_proxy/') ? raw
+        : raw.startsWith('/') ? `/_proxy/${PROXY_HOST}${raw}`
+        : rewriteUrl(raw)
       return new _EventSource(rewritten, dict)
     }
     window.EventSource.prototype  = _EventSource.prototype

@@ -7,15 +7,22 @@ module WrapItRuby
     #
     # Detects the proxy host from two sources (in priority order):
     #
-    #   1. X-Proxy-Host header -- set by the interception script on fetch/XHR.
-    #      Signals the request came from inside the proxy. The actual upstream
-    #      host is resolved from the Referer header.
-    #
-    #   2. Referer header -- contains /_proxy/{host}/... for requests where the
+    #   1. Referer header -- contains /_proxy/{host}/... for requests where the
     #      browser sends the full path. Works for both scripted requests and
     #      asset loads (<img>, <link>, <script>).
     #
-    # Rewrites PATH_INFO to /_proxy/{host}{path} so ProxyMiddleware handles it.
+    #   2. X-Proxy-Host header -- set by the interception script on fetch/XHR.
+    #      Signals the request came from inside the proxy.
+    #
+    # For programmatic requests (fetch/XHR) that carry X-Proxy-Host, the path
+    # is rewritten inline to /_proxy/{host}{path}.
+    #
+    # For browser-initiated requests (script/link/img tags), a 307 redirect is
+    # returned instead.  This ensures the browser's URL for the resource retains
+    # the /_proxy/{host} prefix, which keeps the Referer chain intact for any
+    # sub-resources loaded by that resource (e.g. a JS module that imports
+    # another module via a root-relative path).
+    #
     # Must be inserted BEFORE ProxyMiddleware in the Rack stack.
     #
     class RootRelativeProxyMiddleware
@@ -33,7 +40,21 @@ module WrapItRuby
         unless path.start_with?(PROXY_PREFIX)
           host = extract_proxy_host(env)
           if host
-            env["PATH_INFO"] = "#{PROXY_PREFIX}/#{host}#{path}"
+            proxy_path = "#{PROXY_PREFIX}/#{host}#{path}"
+
+            if env[PROXY_HOST_HEADER]
+              # Programmatic request (fetch/XHR) — rewrite inline.
+              # interception.js already sets the correct Referer and
+              # X-Proxy-Host header so the chain won't break.
+              env["PATH_INFO"] = proxy_path
+            else
+              # Browser-initiated request — redirect so the browser's URL
+              # (and thus Referer for any sub-resource loads) retains the
+              # /_proxy/{host} prefix.
+              query = env["QUERY_STRING"]
+              proxy_path += "?#{query}" unless query.nil? || query.empty?
+              return [307, { "location" => proxy_path }, []]
+            end
           end
         end
 
