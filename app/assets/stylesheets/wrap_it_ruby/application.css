@@ -8,6 +8,32 @@ html, body {
   background-color: white;
 }
 
+#site-content {
+  position: relative;
+}
+
+#site-content::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0px 0px 4px 1px rgb(0 0 0 / 19%);
+  pointer-events: none;
+  border-radius: inherit;
+  border: 1px solid rgb(151 151 151 / 79%);
+}
+
+/*
+.iframe-wrapper::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgb(151 151 151 / 79%);
+  box-shadow: inset 0px 0px 4px 1px rgb(0 0 0 / 19%);
+  pointer-events: none;
+  border-radius: inherit;
+}
+*/
+
 #site-wrapper {
   display: flex;
   flex-direction: column;
@@ -25,7 +51,7 @@ html, body {
     margin: 7px;
     margin-top: 0px;
     border-radius: 15px;
-    background-color: grey;
+    #background-color: grey;
     overflow: hidden;
   }
 }

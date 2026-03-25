@@ -14,8 +14,8 @@ module WrapItRuby
   module MenuHelper
     def menu_config = load_menu
 
-    # Renders the sidebar menu using rails-active-ui component helpers.
-    # Must be called from a view context where ComponentHelper is included.
+    # Renders the menu entries using rails-active-ui component helpers.
+    # Must be called from inside a Menu { } block in the layout.
     #
     # Supports arbitrary nesting depth:
     #   - Top-level entries with "items" render as Fomantic-UI simple
@@ -24,17 +24,15 @@ module WrapItRuby
     #     (dropdown icon + nested .menu inside an .item).
     #   - Leaf entries render as plain linked menu items.
     def render_menu
-      Menu(attached: true) do
-        WrapItRuby::MenuHelper.menu_config.each do |entry|
-          render_menu_entry(entry, top_level: true)
-        end
-        MenuItem(position: 'right') do
-          concat tag.button(class: 'ui mini icon button', onclick: "$('#menu-settings-modal').modal('show')") {
-            tag.i(class: 'pencil icon')
-          }
-        end
+      WrapItRuby::MenuHelper.menu_config.each do |entry|
+        render_menu_entry(entry, top_level: true)
       end
+    end
 
+    # Renders the menu-settings, edit, and add modals.
+    # Call this outside the Menu { } block so modals are not
+    # nested inside the menu bar.
+    def render_menu_modals
       # Settings modal — sortable tree + add button
       concat tag.div(id: 'menu-settings-modal', class: 'ui large modal') {
         safe_join([
