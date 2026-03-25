@@ -35,11 +35,164 @@ module WrapItRuby
         end
       end
 
+      # Settings modal — sortable tree + add button
       concat tag.div(id: 'menu-settings-modal', class: 'ui large modal') {
         safe_join([
                     tag.i(class: 'close icon'),
                     tag.div(class: 'header') { tag.i(class: 'bars icon') + ' Menu Settings' },
-                    tag.div(class: 'scrolling content') { sortable_menu_tree }
+                    tag.div(class: 'scrolling content') {
+                      tag.div(id: 'menu-tree-container') { sortable_menu_tree }
+                    },
+                    tag.div(class: 'actions') {
+                      safe_join([
+                                  tag.button(class: 'ui green button', onclick: 'menuSettingsShowAdd()') {
+                                    tag.i(class: 'plus icon') + ' Add Item'
+                                  }
+                                ])
+                    }
+                  ])
+      }
+
+      # Edit modal — stacked on top of settings modal
+      concat tag.div(id: 'menu-edit-modal', class: 'ui small modal') {
+        safe_join([
+                    tag.i(class: 'close icon'),
+                    tag.div(class: 'header') { 'Edit Menu Item' },
+                    tag.div(class: 'content') {
+                      tag.form(class: 'ui form', id: 'menu-edit-form') {
+                        safe_join([
+                                    tag.input(type: 'hidden', name: 'id', id: 'menu-edit-id'),
+                                    tag.div(class: 'two fields') {
+                                      safe_join([
+                                                  tag.div(class: 'field') {
+                                                    tag.label {
+                                                      'Label'
+                                                    } + tag.input(type: 'text', name: 'label', id: 'menu-edit-label')
+                                                  },
+                                                  tag.div(class: 'field') {
+                                                    tag.label {
+                                                      'Icon'
+                                                    } + tag.input(type: 'text', name: 'icon', id: 'menu-edit-icon',
+                                                                  placeholder: 'e.g. server')
+                                                  }
+                                                ])
+                                    },
+                                    tag.div(class: 'two fields', id: 'menu-edit-proxy-fields') {
+                                      safe_join([
+                                                  tag.div(class: 'field') {
+                                                    tag.label {
+                                                      'Route'
+                                                    } + tag.input(type: 'text', name: 'route', id: 'menu-edit-route',
+                                                                  placeholder: '/path')
+                                                  },
+                                                  tag.div(class: 'field') {
+                                                    tag.label {
+                                                      'URL'
+                                                    } + tag.input(type: 'text', name: 'url', id: 'menu-edit-url',
+                                                                  placeholder: 'upstream.example.com')
+                                                  }
+                                                ])
+                                    },
+                                    tag.div(class: 'field') {
+                                      tag.label { 'Type' } +
+                                      tag.select(name: 'item_type', id: 'menu-edit-type', class: 'ui dropdown',
+                                                 onchange: "menuSettingsToggleProxyFields('menu-edit')") {
+                                        safe_join([
+                                                    tag.option(value: 'group') { 'Group' },
+                                                    tag.option(value: 'proxy') { 'Proxy' }
+                                                  ])
+                                      }
+                                    }
+                                  ])
+                      }
+                    },
+                    tag.div(class: 'actions') {
+                      safe_join([
+                                  tag.button(class: 'ui red left floated button', onclick: 'menuSettingsDelete()') {
+                                    tag.i(class: 'trash icon') + ' Delete'
+                                  },
+                                  tag.button(class: 'ui button', onclick: "$('#menu-edit-modal').modal('hide')") {
+                                    'Cancel'
+                                  },
+                                  tag.button(class: 'ui green button', onclick: 'menuSettingsSave()') {
+                                    tag.i(class: 'save icon') + ' Save'
+                                  }
+                                ])
+                    }
+                  ])
+      }
+
+      # Add modal — stacked on top of settings modal
+      concat tag.div(id: 'menu-add-modal', class: 'ui small modal') {
+        safe_join([
+                    tag.i(class: 'close icon'),
+                    tag.div(class: 'header') { 'Add Menu Item' },
+                    tag.div(class: 'content') {
+                      tag.form(class: 'ui form', id: 'menu-add-form') {
+                        safe_join([
+                                    tag.div(class: 'field') {
+                                      tag.label { 'Type' } +
+                                      tag.select(name: 'item_type', id: 'menu-add-type', class: 'ui dropdown',
+                                                 onchange: "menuSettingsToggleProxyFields('menu-add')") {
+                                        safe_join([
+                                                    tag.option(value: 'group') { 'Group' },
+                                                    tag.option(value: 'proxy') { 'Proxy' }
+                                                  ])
+                                      }
+                                    },
+                                    tag.div(class: 'two fields') {
+                                      safe_join([
+                                                  tag.div(class: 'field') {
+                                                    tag.label {
+                                                      'Label'
+                                                    } + tag.input(type: 'text', name: 'label', id: 'menu-add-label')
+                                                  },
+                                                  tag.div(class: 'field') {
+                                                    tag.label {
+                                                      'Icon'
+                                                    } + tag.input(type: 'text', name: 'icon', id: 'menu-add-icon',
+                                                                  placeholder: 'e.g. server')
+                                                  }
+                                                ])
+                                    },
+                                    tag.div(class: 'two fields', id: 'menu-add-proxy-fields', style: 'display:none') {
+                                      safe_join([
+                                                  tag.div(class: 'field') {
+                                                    tag.label {
+                                                      'Route'
+                                                    } + tag.input(type: 'text', name: 'route', id: 'menu-add-route',
+                                                                  placeholder: '/path')
+                                                  },
+                                                  tag.div(class: 'field') {
+                                                    tag.label {
+                                                      'URL'
+                                                    } + tag.input(type: 'text', name: 'url', id: 'menu-add-url',
+                                                                  placeholder: 'upstream.example.com')
+                                                  }
+                                                ])
+                                    },
+                                    tag.div(class: 'field') {
+                                      tag.label { 'Parent' } +
+                                      tag.select(name: 'parent_id', id: 'menu-add-parent', class: 'ui dropdown') {
+                                        safe_join([
+                                                    tag.option(value: '') { 'Root (top level)' },
+                                                    *menu_group_options
+                                                  ])
+                                      }
+                                    }
+                                  ])
+                      }
+                    },
+                    tag.div(class: 'actions') {
+                      safe_join([
+                                  tag.button(class: 'ui button', onclick: "$('#menu-add-modal').modal('hide')") {
+                                    'Cancel'
+                                  },
+                                  tag.button(class: 'ui green button', onclick: 'menuSettingsCreate()') {
+                                    tag.i(class: 'plus icon') + ' Add'
+                                  }
+                                ])
+                    }
                   ])
       }
     end
@@ -124,6 +277,19 @@ module WrapItRuby
           },
           nodes: item.children.any? ? menu_items_to_nodes(item.children) : []
         }
+      end
+    end
+
+    # Builds <option> tags for all group items (for parent dropdown in add modal).
+    # Indents sub-groups with dashes to show hierarchy.
+    def menu_group_options(items = nil, depth = 0)
+      items ||= ::MenuItem.groups.where(parent_id: nil).order(:position).includes(children: :children)
+      items.flat_map do |item|
+        prefix = "\u00A0\u00A0" * depth + (depth > 0 ? "\u2514 " : '')
+        opts = [tag.option(value: item.id) { "#{prefix}#{item.label}" }]
+        sub_groups = item.children.select(&:group?)
+        opts += menu_group_options(sub_groups, depth + 1) if sub_groups.any?
+        opts
       end
     end
 
