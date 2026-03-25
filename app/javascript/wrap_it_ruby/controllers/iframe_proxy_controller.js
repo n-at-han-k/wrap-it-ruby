@@ -14,6 +14,9 @@
 // - Breakout:      if navigation inside the iframe lands on a path
 //                  belonging to a DIFFERENT menu route, Turbo.visit
 //                  swaps the frame to the new route.
+// - Tab sync:      mirrors the iframe's <title> and favicon into the
+//                  parent page so the browser tab reflects the proxied
+//                  content.
 //
 import { Controller } from "@hotwired/stimulus"
 
@@ -24,12 +27,22 @@ export default class extends Controller {
     host:    String,  // proxy host, e.g. "github.com"
   }
 
+  #originalTitle
+  #originalIcons
+
   connect() {
+    this.#originalTitle = document.title
+    this.#originalIcons = [...document.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"]')]
+
     this.element.addEventListener("load", this.onLoad)
     window.addEventListener("popstate", this.onPopstate)
   }
 
   disconnect() {
+    document.title = this.#originalTitle
+    this.#removeIcons()
+    this.#originalIcons.forEach(el => document.head.appendChild(el))
+
     this.element.removeEventListener("load", this.onLoad)
     window.removeEventListener("popstate", this.onPopstate)
   }
@@ -45,6 +58,7 @@ export default class extends Controller {
       Turbo.visit(breakout, { action: "advance" })
     } else {
       this.#syncHistory(iframePath)
+      this.#syncTab()
     }
   }
 
@@ -83,5 +97,51 @@ export default class extends Controller {
     if (browserPath !== window.location.pathname + window.location.search) {
       history.pushState({ iframeSrc: iframePath }, "", browserPath)
     }
+  }
+
+  // Read the iframe's <title> and favicon, apply them to the parent page.
+  #syncTab() {
+    try {
+      const doc = this.element.contentDocument
+      if (!doc) return
+
+      if (doc.title) document.title = doc.title
+
+      const icon = doc.querySelector('link[rel="icon"], link[rel="shortcut icon"]')
+      if (icon) {
+        const href = this.#resolveHref(icon.getAttribute("href"))
+        if (href) this.#setFavicon(href)
+      }
+    } catch (_) {
+      // cross-origin iframe – cannot access contentDocument
+    }
+  }
+
+  // Resolve a favicon href from the iframe document.
+  // Absolute / data URIs pass through unchanged; root-relative and
+  // relative paths are routed through the proxy.
+  #resolveHref(raw) {
+    if (!raw) return null
+    if (raw.startsWith("data:") || /^https?:\/\//.test(raw) || raw.startsWith("//")) return raw
+
+    if (raw.startsWith("/")) {
+      return `/_proxy/${this.hostValue}${raw}`
+    }
+
+    // Relative path – resolve against the iframe's current directory
+    const dir = this.element.contentWindow.location.pathname.replace(/\/[^/]*$/, "/")
+    return `${dir}${raw}`
+  }
+
+  #setFavicon(href) {
+    this.#removeIcons()
+    const link = document.createElement("link")
+    link.rel = "icon"
+    link.href = href
+    document.head.appendChild(link)
+  }
+
+  #removeIcons() {
+    document.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"]').forEach(el => el.remove())
   }
 }
