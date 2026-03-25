@@ -1,0 +1,53 @@
+<style>
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.6em 0.8em;
+    background: white;
+    border: 1px solid rgba(34, 36, 38, 0.15);
+    border-radius: 4px;
+    margin-bottom: 4px;
+  }
+
+  .menu-item .drag-handle {
+    cursor: grab;
+    color: #999;
+  }
+
+  .menu-item .route-label {
+    margin-left: auto;
+    color: #888;
+    font-size: 0.85em;
+  }
+
+  .children-container {
+    margin-left: 1.5em;
+    padding: 4px 0;
+    min-height: 8px;
+  }
+
+  .sortable-ghost {
+    opacity: 0.4;
+    background: #f0f8ff;
+  }
+</style>
+
+<div data-controller="wrap-it-ruby--auto-modal">
+  <% Modal(size: :large) do |c| %>
+    <% c.header do %>
+      <% Icon(name: "bars") %>
+      <% text " Menu Settings" %>
+    <% end %>
+    <% c.content do %>
+      <div id="menu-settings-list"
+           data-controller="wrap-it-ruby--sortable"
+           data-wrap-it-ruby--sortable-group-value="roots"
+           data-sortable-parent-id="">
+        <% @menu_items.each do |group| %>
+          <%= render partial: "wrap_it_ruby/menu_settings/menu_item", locals: { item: group } %>
+        <% end %>
+      </div>
+    <% end %>
+  <% end %>
+</div>

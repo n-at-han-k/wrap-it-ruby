@@ -16,6 +16,14 @@
       icon: code
       type: proxy
 
+    - label: Guides
+      items:
+        - label: Getting Started
+          route: /docs/guides/start
+          url: guides.example.com
+          icon: play
+          type: proxy
+
 - label: About
   route: /about
   icon: info
