@@ -31,6 +31,10 @@ html, body {
 }
 
 /* Sortable tree styles (menu settings modal) */
+.st-tree {
+  width: 100%;
+}
+
 sortable-tree-node {
   display: block;
   margin: 2px 0;

@@ -28,7 +28,7 @@ export default class extends Controller {
       lockRootLevel: this.lockRootValue,
       initCollapseLevel: this.collapseLevelValue,
       styles: {
-        tree: "ui styled fluid tree",
+        tree: "st-tree",
         node: "st-node",
         nodeHover: "st-node--hover",
         nodeDragging: "st-node--dragging",
