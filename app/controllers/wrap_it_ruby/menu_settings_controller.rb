@@ -13,16 +13,20 @@ module WrapItRuby
     end
 
     def sort
-      item = ::MenuItem.find(params[:id])
+      ordering = params.require(:ordering)
 
       ::MenuItem.transaction do
-        new_parent_id = params[:parent_id].presence
-        if item.parent_id.to_s != new_parent_id.to_s
-          item.remove_from_list
-          item.update!(parent_id: new_parent_id)
-        end
+        ordering.each do |entry|
+          item = ::MenuItem.find(entry[:id])
+          new_parent_id = entry[:parent_id].presence
 
-        item.insert_at(params[:position].to_i)
+          if item.parent_id.to_s != new_parent_id.to_s
+            item.remove_from_list
+            item.update!(parent_id: new_parent_id)
+          end
+
+          item.insert_at(entry[:position].to_i)
+        end
       end
 
       respond_to do |format|

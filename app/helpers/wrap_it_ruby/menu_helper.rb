@@ -39,20 +39,11 @@ module WrapItRuby
 
       return unless database_menu_available?
 
-      items = ::MenuItem.roots.includes(children: :children)
-
       concat tag.div(id: 'menu-settings-modal', class: 'ui large modal') {
         safe_join([
                     tag.i(class: 'close icon'),
                     tag.div(class: 'header') { tag.i(class: 'bars icon') + ' Menu Settings' },
-                    tag.div(class: 'scrolling content') {
-                      # Top-level: use the Accordion component (gets "ui styled" + data-controller)
-                      capture {
-                        Accordion(styled: true, exclusive: false) {
-                          items.each { |item| render_accordion_node(item, root: false) }
-                        }
-                      }
-                    }
+                    tag.div(class: 'scrolling content') { sortable_menu_tree }
                   ])
       }
     end
@@ -103,55 +94,40 @@ module WrapItRuby
       end
     end
 
-    # Renders a .title + .content pair for a menu item.
-    # Groups (items with children) nest another <div class="accordion"> inside content.
-    # Leaves render editable form fields in content.
-    # Only the top-level Accordion component needs "ui styled" + data-controller.
-    # Nested accordions are plain <div class="accordion">.
-    def render_accordion_node(item, root: false)
-      icon_el = item.icon.present? ? tag.i(class: "#{item.icon} icon") : nil
-      title_inner = safe_join([tag.i(class: 'dropdown icon'), icon_el, " #{item.label}"].compact)
+    # Renders a sortable-tree container.
+    # Pass an array of MenuItem records (roots with children eager-loaded).
+    # The Stimulus controller reads the JSON and initializes sortable-tree.
+    def sortable_menu_tree
+      items = ::MenuItem.roots.includes(children: :children)
+      nodes_json = menu_items_to_nodes(items).to_json
+      sort_url = wrap_it_ruby.sort_menu_setting_path(id: 'bulk')
 
-      concat tag.div(class: 'active title') { title_inner }
-
-      concat tag.div(class: 'active content') {
-        if item.children.any?
-          # Nest another accordion for children
-          tag.div(class: 'accordion') {
-            safe_join(item.children.map { |child| capture { render_accordion_node(child) } })
-          }
-        else
-          # Leaf: editable form fields
-          render_accordion_leaf_fields(item)
-        end
-      }
+      tag.div(
+        data: {
+          controller: 'wrap-it-ruby--sortable-tree',
+          "wrap-it-ruby--sortable-tree-nodes-value": nodes_json,
+          "wrap-it-ruby--sortable-tree-sort-url-value": sort_url,
+          "wrap-it-ruby--sortable-tree-lock-root-value": false,
+          "wrap-it-ruby--sortable-tree-collapse-level-value": 3
+        }
+      )
     end
 
-    # Renders form fields for a leaf menu item.
-    def render_accordion_leaf_fields(item)
-      update_url = wrap_it_ruby.update_menu_setting_path(item)
-
-      tag.div(class: 'ui small form') do
-        tag.div(class: 'equal width fields', style: 'margin-bottom:0;') do
-          safe_join([
-                      tag.div(class: 'field') do
-                        tag.input(type: 'text', name: 'icon', value: item.icon, placeholder: 'icon',
-                                  data: { url: update_url })
-                      end,
-                      tag.div(class: 'field') do
-                        tag.input(type: 'text', name: 'label', value: item.label, placeholder: 'Label',
-                                  data: { url: update_url })
-                      end,
-                      tag.div(class: 'field') do
-                        tag.input(type: 'text', name: 'route', value: item.route, placeholder: '/route',
-                                  data: { url: update_url })
-                      end,
-                      tag.div(class: 'field') do
-                        tag.input(type: 'text', name: 'url', value: item.url, placeholder: 'upstream url',
-                                  data: { url: update_url })
-                      end
-                    ])
-        end
+    # Converts MenuItem records to the sortable-tree nodes format:
+    #   [{ data: { id:, title:, icon:, route:, url: }, nodes: [...] }]
+    def menu_items_to_nodes(items)
+      items.map do |item|
+        {
+          data: {
+            id: item.id,
+            title: item.label,
+            icon: item.icon,
+            route: item.route,
+            url: item.url,
+            item_type: item.item_type
+          },
+          nodes: item.children.any? ? menu_items_to_nodes(item.children) : []
+        }
       end
     end
 
