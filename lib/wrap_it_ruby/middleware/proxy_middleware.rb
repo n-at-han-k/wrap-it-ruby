@@ -27,7 +27,6 @@ module WrapItRuby
         authorization
         cache-control
         content-type
-        content-length
         cookie
         if-match
         if-modified-since
@@ -149,9 +148,10 @@ module WrapItRuby
           headers.add(name, value)
         end
 
-        # Also forward content-type/content-length from Rack env
-        headers.add('content-type', env['CONTENT_TYPE'])     if env['CONTENT_TYPE']
-        headers.add('content-length', env['CONTENT_LENGTH']) if env['CONTENT_LENGTH']
+        # Forward content-type from Rack env (Rack stores it without HTTP_ prefix)
+        # Note: content-length is NOT forwarded — Async::HTTP::Client sets it
+        # automatically from the body, and duplicates cause nginx to return 400.
+        headers.add('content-type', env['CONTENT_TYPE']) if env['CONTENT_TYPE']
 
         # 2. Modify: nothing to modify at this stage (cookies pass through
         #    as-is since the .cia.net domain covers both proxy and upstream)
