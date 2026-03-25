@@ -28,7 +28,24 @@ module WrapItRuby
         WrapItRuby::MenuHelper.menu_config.each do |entry|
           render_menu_entry(entry, top_level: true)
         end
+        if WrapItRuby.menu_item_class
+          MenuItem(position: 'right') do
+            concat tag.button(class: 'ui mini icon button', onclick: "$('#menu-settings-modal').modal('show')") {
+              tag.i(class: 'pencil icon')
+            }
+          end
+        end
       end
+
+      return unless WrapItRuby.menu_item_class
+
+      concat tag.div(id: 'menu-settings-modal', class: 'ui large modal') {
+        safe_join([
+                    tag.i(class: 'close icon'),
+                    tag.div(class: 'header') { tag.i(class: 'bars icon') + ' Menu Settings' },
+                    tag.div(class: 'content') { 'TODO' }
+                  ])
+      }
     end
 
     def all_menu_items
