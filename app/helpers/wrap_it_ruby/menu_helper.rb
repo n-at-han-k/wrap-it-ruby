@@ -39,11 +39,34 @@ module WrapItRuby
 
       return unless database_menu_available?
 
-      concat tag.div(id: 'menu-settings-modal', class: 'ui large modal') {
+      items = ::MenuItem.roots.includes(children: :children)
+
+      sortable_list = tag.div(
+        id: 'menu-settings-list',
+        data: {
+          controller: 'wrap-it-ruby--sortable',
+          "wrap-it-ruby--sortable-group-value": 'roots',
+          "sortable-parent-id": ''
+        }
+      ) do
+        safe_join(items.map do |item|
+          render(partial: 'wrap_it_ruby/menu_settings/menu_item', locals: { item: item })
+        end)
+      end
+
+      concat(tag.style do
+        '.menu-settings-modal .menu-item { display:flex; align-items:center; gap:0.5em; padding:0.6em 0.8em; background:white; border:1px solid rgba(34,36,38,0.15); border-radius:4px; margin-bottom:4px; } ' \
+        '.menu-settings-modal .drag-handle { cursor:grab; color:#999; } ' \
+        '.menu-settings-modal .route-label { margin-left:auto; color:#888; font-size:0.85em; } ' \
+        '.menu-settings-modal .children-container { margin-left:1.5em; padding:4px 0; min-height:8px; } ' \
+        '.menu-settings-modal .sortable-ghost { opacity:0.4; background:#f0f8ff; }'
+      end)
+
+      concat tag.div(id: 'menu-settings-modal', class: 'ui large modal menu-settings-modal') {
         safe_join([
                     tag.i(class: 'close icon'),
                     tag.div(class: 'header') { tag.i(class: 'bars icon') + ' Menu Settings' },
-                    tag.div(class: 'content') { 'TODO' }
+                    tag.div(class: 'scrolling content') { sortable_list }
                   ])
       }
     end
