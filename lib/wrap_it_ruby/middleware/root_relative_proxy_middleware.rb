@@ -43,9 +43,17 @@ module WrapItRuby
       private
 
       def extract_proxy_host(env)
+        # 1. Try the Referer path (works for browser-initiated asset loads)
         referer = env["HTTP_REFERER"]
-        match = REFERER_PATTERN.match(referer) if referer
-        match[:host] if match
+        if referer
+          match = REFERER_PATTERN.match(referer)
+          return match[:host].delete_suffix(".") if match
+        end
+
+        # 2. Fall back to X-Proxy-Host header (set by interception.js on
+        #    fetch/XHR — covers cases where the Referer lost the /_proxy/
+        #    prefix after a server-side rewrite hop)
+        env[PROXY_HOST_HEADER]&.delete_suffix(".")
       end
     end
   end

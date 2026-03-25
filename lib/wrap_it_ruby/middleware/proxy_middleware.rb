@@ -2,7 +2,7 @@
 
 require "async/http/client"
 require "async/http/endpoint"
-require "async/websocket/adapters/rack"
+require "cgi"
 
 module WrapItRuby
   module Middleware
@@ -10,6 +10,8 @@ module WrapItRuby
     #
     # Strips frame-blocking headers so responses render inside an iframe.
     # Rewrites Location headers so redirects stay within the proxy.
+    # Rewrites proxy URLs in query parameters so upstream auth flows work.
+    # Rewrites Set-Cookie domains to the configured cookie domain.
     # Detects WebSocket upgrades and pipes frames bidirectionally.
     #
     class ProxyMiddleware
@@ -27,14 +29,17 @@ module WrapItRuby
       ].freeze
 
       def initialize(app)
-        @app     = app
-        @clients = {}
+        @app          = app
+        @clients      = {}
+        @proxy_host   = ENV["WRAP_IT_PROXY_HOST"]
+        @cookie_domain = ENV.fetch("WRAP_IT_COOKIE_DOMAIN", ".cia.net")
+        @auth_host    = ENV.fetch("WRAP_IT_AUTH_HOST", "auth.cia.net")
       end
 
       def call(env)
         PATTERN.match(env["PATH_INFO"].to_s).then do |match|
           if match
-            host = match[:host]
+            host = match[:host].delete_suffix(".")
             path = match[:path] || "/"
 
             if websocket?(env)
@@ -56,6 +61,7 @@ module WrapItRuby
         client = client_for(host)
 
         query     = env["QUERY_STRING"]
+        query     = deproxify_query(query) if query && !query.empty?
         full_path = query && !query.empty? ? "#{path}?#{query}" : path
         headers   = forwarded_headers(env, host)
         body      = read_body(env)
@@ -79,10 +85,19 @@ module WrapItRuby
       end
 
       # ---- WebSocket ----
+      #
+      # WebSocket requests are handled by WebSocketProxy at the Protocol::HTTP
+      # level, before they reach Rack. This detection is kept as a safety net.
 
       def websocket?(env)
-        Async::WebSocket::Adapters::Rack.websocket?(env)
-        false
+        upgrade = env["HTTP_UPGRADE"]
+        upgrade && upgrade.casecmp?("websocket")
+      end
+
+      def proxy_websocket(env, host, path)
+        # Should not reach here — WebSocketProxy handles WS before Rack.
+        # Return 502 as a fallback.
+        [502, { "content-type" => "text/plain" }, ["WebSocket requests must be handled at Protocol::HTTP level"]]
       end
 
       # ---- Helpers ----
@@ -120,26 +135,75 @@ module WrapItRuby
           next if key == "content-security-policy-report-only"
           next if key == "content-encoding"
           next if HOP_HEADERS.include?(key)
+
+          if key == "set-cookie"
+            value = rewrite_cookie_domain(value)
+          end
+
           result[name] = value
         end
 
-        # Rewrite Location headers so redirects stay within the proxy
+        rewrite_location(result, host)
+
+        result
+      end
+
+      # ---- Query parameter rewriting ----
+      #
+      # Rewrites proxy URLs embedded in query parameter values back to real
+      # upstream URLs before forwarding.  This fixes auth flows where the
+      # upstream validates return_url / redirect_uri against its own host.
+      #
+      #   https://4000.cia.net/_proxy/argocd.cia.net/applications
+      #   → https://argocd.cia.net/applications
+      #
+      def deproxify_query(query)
+        return query unless @proxy_host
+
+        # Match both encoded and unencoded forms of the proxy URL prefix
+        proxy_prefix          = "https://#{@proxy_host}/_proxy/"
+        proxy_prefix_encoded  = CGI.escape("https://#{@proxy_host}/_proxy/")
+
+        query
+          .gsub(proxy_prefix_encoded) { |m| CGI.escape("https://") }
+          .gsub(proxy_prefix)         { "https://" }
+      end
+
+      # ---- Redirect rewriting ----
+      #
+      # Rewrites Location headers so redirects stay within the proxy.
+      # Auth redirects (to Authelia) are also proxied so the login page
+      # renders inside the iframe — the proxy strips CSP/X-Frame-Options
+      # that would otherwise block framing.
+      #
+      def rewrite_location(result, host)
         if (location = result["location"] || result["Location"])
           result_key = result.key?("location") ? "location" : "Location"
           begin
             uri = URI.parse(location)
-            if uri.host == host || uri.host&.end_with?(".#{host}")
-              redirect_host = uri.host || host
-              result[result_key] = "/_proxy/#{redirect_host}#{uri.path}#{"?#{uri.query}" if uri.query}"
-            elsif uri.relative?
-              result[result_key] = "/_proxy/#{host}#{location}"
+            if uri.host
+              result[result_key] = "/_proxy/#{uri.host.delete_suffix(".")}#{uri.path}#{"?#{uri.query}" if uri.query}"
+            else
+              # Resolve relative redirects (e.g. "./?folder=..." or "../foo")
+              # against the upstream host to get an absolute path.
+              resolved = URI.join("https://#{host}/", location)
+              result[result_key] = "/_proxy/#{host}#{resolved.path}#{"?#{resolved.query}" if resolved.query}"
             end
           rescue URI::InvalidURIError
             # leave it alone
           end
         end
+      end
 
-        result
+      # ---- Cookie domain rewriting ----
+      #
+      # Rewrites Set-Cookie Domain attributes to the configured cookie
+      # domain so the browser stores upstream cookies correctly.
+      #
+      #   Domain=argocd.cia.net → Domain=.cia.net
+      #
+      def rewrite_cookie_domain(cookie)
+        cookie.gsub(/Domain=[^;]+/i, "Domain=#{@cookie_domain}")
       end
 
       def read_body(env)

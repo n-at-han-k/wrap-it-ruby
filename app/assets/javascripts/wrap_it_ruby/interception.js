@@ -14,6 +14,13 @@
 
   console.log('[interception]', 'loaded');
 
+  // Block service worker registration — proxied apps share the proxy
+  // origin so a SW registered by one app (e.g. code-server) would
+  // intercept requests for all proxied sites with stale cached paths.
+  if (navigator.serviceWorker) {
+    navigator.serviceWorker.register = () => Promise.resolve()
+  }
+
   var _fetch        = window.fetch;
   var _XHR          = window.XMLHttpRequest;
   var _xhrOpen      = _XHR.prototype.open;
@@ -92,15 +99,16 @@
     const url = isReq ? input.url : String(input instanceof URL ? input.href : input)
 
     const headers = new Headers(init.headers || (isReq ? input.headers : {}))
-    headers.set('x-proxy-host', '_proxy')
+    headers.set('x-proxy-host', PROXY_HOST)
 
     const newInit = {
       method: init.method || (isReq ? input.method : 'GET'),
       headers,
       body: 'body' in init ? init.body : (isReq ? input.body : null),
+      referrer: `/_proxy/${PROXY_HOST}/`,
     }
 
-    const passthrough = ['credentials', 'mode', 'cache', 'redirect', 'referrer',
+    const passthrough = ['credentials', 'mode', 'cache', 'redirect',
       'referrerPolicy', 'integrity', 'keepalive', 'signal']
     for (const key of passthrough) {
       if (key in init) newInit[key] = init[key]
@@ -134,39 +142,54 @@
       _xhrOpen.call(this, meta.method, rewritten, ...meta.openArgs)
     }
 
-    _xhrSetHeader.call(this, 'x-proxy-host', '_proxy')
+    _xhrSetHeader.call(this, 'x-proxy-host', PROXY_HOST)
     return _xhrSend.call(this, body)
   }
 
   // ============================= WebSocket ===================================
 
-  //window.WebSocket = function (url, protocols) {
-  //  var req = { type: 'websocket', url: rewriteUrl(url), originalUrl: url,
-  //              method: 'GET', headers: {}, body: null };
-  //  runRequestHooks(req);
-  //  if (protocols !== undefined) return new _WebSocket(req.url, protocols);
-  //  return new _WebSocket(req.url);
-  //};
-  //window.WebSocket.prototype  = _WebSocket.prototype;
-  //window.WebSocket.CONNECTING = _WebSocket.CONNECTING;
-  //window.WebSocket.OPEN       = _WebSocket.OPEN;
-  //window.WebSocket.CLOSING    = _WebSocket.CLOSING;
-  //window.WebSocket.CLOSED     = _WebSocket.CLOSED;
+  // Rewrite WebSocket URLs so they go through the proxy.
+  // wss://code.cia.net/ws → wss://4000.cia.net/_proxy/code.cia.net/ws
+  const rewriteWsUrl = (url) => {
+    const raw = typeof url === 'string' ? url : url.toString()
+    try {
+      const parsed = new URL(raw)
+      if (parsed.host === window.__hostingSite) return raw
+      // Rewrite wss://upstream/path → wss://proxy/_proxy/upstream/path
+      return `${parsed.protocol}//${window.__hostingSite}/_proxy/${parsed.host}${parsed.pathname}${parsed.search}`
+    } catch {
+      // Relative URL — prefix with proxy host
+      if (raw.startsWith('/')) {
+        return `wss://${window.__hostingSite}/_proxy/${PROXY_HOST}${raw}`
+      }
+      return raw
+    }
+  }
 
-  //// ============================ EventSource ==================================
+  window.WebSocket = function (url, protocols) {
+    const rewritten = rewriteWsUrl(url)
+    console.log('[interception] WebSocket', url, '->', rewritten)
+    if (protocols !== undefined) return new _WebSocket(rewritten, protocols)
+    return new _WebSocket(rewritten)
+  }
+  window.WebSocket.prototype  = _WebSocket.prototype
+  window.WebSocket.CONNECTING = _WebSocket.CONNECTING
+  window.WebSocket.OPEN       = _WebSocket.OPEN
+  window.WebSocket.CLOSING    = _WebSocket.CLOSING
+  window.WebSocket.CLOSED     = _WebSocket.CLOSED
 
-  //if (_EventSource) {
-  //  window.EventSource = function (url, dict) {
-  //    var raw = typeof url === 'string' ? url : url.href;
-  //    var req = { type: 'eventsource', url: rewriteUrl(raw), originalUrl: raw,
-  //                method: 'GET', headers: {}, body: null };
-  //    runRequestHooks(req);
-  //    return new _EventSource(req.url, dict);
-  //  };
-  //  window.EventSource.prototype  = _EventSource.prototype;
-  //  window.EventSource.CONNECTING = _EventSource.CONNECTING;
-  //  window.EventSource.OPEN       = _EventSource.OPEN;
-  //  window.EventSource.CLOSED     = _EventSource.CLOSED;
-  //}
+  // ============================ EventSource ==================================
+
+  if (_EventSource) {
+    window.EventSource = function (url, dict) {
+      const raw = typeof url === 'string' ? url : url.href
+      const rewritten = raw.startsWith('/') ? `/_proxy/${PROXY_HOST}${raw}` : rewriteUrl(raw)
+      return new _EventSource(rewritten, dict)
+    }
+    window.EventSource.prototype  = _EventSource.prototype
+    window.EventSource.CONNECTING = _EventSource.CONNECTING
+    window.EventSource.OPEN       = _EventSource.OPEN
+    window.EventSource.CLOSED     = _EventSource.CLOSED
+  }
 
 })(window);

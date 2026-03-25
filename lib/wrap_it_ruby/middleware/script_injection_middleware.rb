@@ -27,7 +27,7 @@ module WrapItRuby
         path = env["PATH_INFO"].to_s
 
         if path.start_with?(PROXY_PREFIX)
-          host = path.delete_prefix(PROXY_PREFIX).split("/", 2).first
+          host = path.delete_prefix(PROXY_PREFIX).split("/", 2).first.delete_suffix(".")
           hosting_site = env["HTTP_HOST"]
 
           env.delete("HTTP_ACCEPT_ENCODING")
@@ -70,6 +70,12 @@ module WrapItRuby
         unless html.sub!(%r{(<head[^>]*>)}i, "\\1#{tag}")
           html.prepend(tag)
         end
+
+        # Strip restrictive referrer policies (e.g. strict-origin) that
+        # truncate the Referer to just the origin.  RootRelativeProxyMiddleware
+        # needs the full path (/_proxy/{host}/…) in the Referer to route
+        # root-relative asset requests back through the proxy.
+        html.gsub!(%r{<meta[^>]+name=["']referrer["'][^>]*>}i, "")
 
         headers.delete("content-length")
         headers["content-length"] = html.bytesize.to_s
