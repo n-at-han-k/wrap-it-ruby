@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'ui'
+require 'emoji_validator'
 require 'wrap_it_ruby/middleware/proxy_middleware'
 require 'wrap_it_ruby/middleware/root_relative_proxy_middleware'
 require 'wrap_it_ruby/middleware/script_injection_middleware'
@@ -39,6 +40,14 @@ module WrapItRuby
 
       # rails-active-ui ships stylesheets.css directly in app/assets/
       app.config.assets.paths << Ui::Engine.root.join('app/assets')
+    end
+
+    # Append engine migrations to the host app's migration paths.
+    initializer 'wrap_it_ruby.migrations' do |app|
+      config.paths["db/migrate"].expanded.each do |expanded_path|
+        app.config.paths["db/migrate"] << expanded_path
+        ActiveRecord::Migrator.migrations_paths << expanded_path
+      end
     end
 
     # Make engine helpers (MenuHelper, IframeHelper) available in host app views.

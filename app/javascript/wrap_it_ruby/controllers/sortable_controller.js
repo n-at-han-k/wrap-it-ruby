@@ -32,15 +32,8 @@ export default class extends Controller {
           el.removeAttribute("data-controller")
         })
       },
-      onStart: (evt) => {
-        console.log("[sortable] onStart", evt.item.textContent.trim().slice(0, 30))
-      },
-      onChange: (evt) => {
-        console.log("[sortable] onChange", { newIndex: evt.newIndex, oldIndex: evt.oldIndex })
-      },
       onEnd: (evt) => {
-        console.log("[sortable] onEnd", { oldIndex: evt.oldIndex, newIndex: evt.newIndex })
-        this.#persist(evt.item, evt.newIndex)
+        this.#persist(evt.item, evt.newIndex, evt.to)
       },
     })
   }
@@ -56,9 +49,14 @@ export default class extends Controller {
     }, 100)
   }
 
-  #persist(item, newIndex) {
+  #persist(item, newIndex, toContainer) {
     const url = item.dataset.sortableUpdateUrl
     if (!url) return
+
+    const parentEl = toContainer.closest("[data-sortable-update-url]")
+    const parentId = parentEl
+      ? parentEl.dataset.sortableUpdateUrl.match(/\/(\d+)$/)?.[1]
+      : null
 
     fetch(url, {
       method: "PATCH",
@@ -66,7 +64,7 @@ export default class extends Controller {
         "Content-Type": "application/json",
         "X-CSRF-Token": this.#csrfToken,
       },
-      body: JSON.stringify({ position: newIndex + 1 }),
+      body: JSON.stringify({ position: newIndex + 1, parent_id: parentId }),
     })
   }
 

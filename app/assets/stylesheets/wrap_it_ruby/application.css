@@ -17,6 +17,7 @@
 .drag-handle {
   cursor: grab;
   opacity: 0.4;
+  margin-left: 0.5em !important;
 }
 
 .drag-handle:active {
@@ -35,8 +36,22 @@ details[open] > div > .ui.segments:empty {
   margin: 4px;
 }
 
+/* Accordion segments: <details> with segment class */
+details.ui.segment {
+  padding: 0;
+}
+
+details.ui.segment > summary {
+  padding: 1em;
+  cursor: pointer;
+}
+
 details.ui.segment > div {
-  padding-top: 0.5em;
+  padding: 0 1em 1em;
+}
+
+.edit-link > .icon {
+  line-height: inherit !important;
 }
 
 

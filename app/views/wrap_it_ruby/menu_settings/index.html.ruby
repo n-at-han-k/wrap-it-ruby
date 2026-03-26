@@ -14,9 +14,11 @@ Container {
       if item.group?
         Accordion(attached: true, data: { sortable_update_url: update_menu_setting_path(item) }) { |a|
           a.title {
-            Icon(name: "braille", class: "drag-handle")
-            Icon(name: item.icon) if item.icon
+            Icon(name: "arrows alternate", class: "drag-handle")
+            text item.icon if item.icon
+            text " "
             text item.label
+            Link(href: edit_menu_setting_path(item), class: "edit-link") { Icon(name: "pencil") }
           }
           Wrapper(html_class: "ui segments",
             data: {
@@ -27,11 +29,13 @@ Container {
             item.children.each do |child|
               if child.group?
                 Accordion(attached: true, data: { sortable_update_url: update_menu_setting_path(child) }) { |a2|
-              a2.title {
-                Icon(name: "braille", class: "drag-handle")
-                Icon(name: child.icon) if child.icon
-                text child.label
-              }
+                  a2.title {
+                    Icon(name: "arrows alternate", class: "drag-handle")
+                    text child.icon if child.icon
+                    text " "
+                    text child.label
+                    Link(href: edit_menu_setting_path(child), class: "edit-link") { Icon(name: "pencil") }
+                  }
                   Wrapper(html_class: "ui segments",
                     data: {
                       controller: "wrap-it-ruby--sortable",
@@ -40,18 +44,22 @@ Container {
                     }) {
                     child.children.each do |grandchild|
                       Segment(attached: true, data: { sortable_update_url: update_menu_setting_path(grandchild) }) {
-                        Icon(name: "braille", class: "drag-handle")
-                        Icon(name: grandchild.icon) if grandchild.icon
+                        Icon(name: "arrows alternate", class: "drag-handle")
+                        text grandchild.icon if grandchild.icon
+                        text " "
                         text grandchild.label
+                        Link(href: edit_menu_setting_path(grandchild), class: "edit-link") { Icon(name: "pencil") }
                       }
                     end
                   }
                 }
               else
                 Segment(attached: true, data: { sortable_update_url: update_menu_setting_path(child) }) {
-                  Icon(name: "braille", class: "drag-handle")
-                  Icon(name: child.icon) if child.icon
+                  Icon(name: "arrows alternate", class: "drag-handle")
+                  text child.icon if child.icon
+                  text " "
                   text child.label
+                  Link(href: edit_menu_setting_path(child), class: "edit-link") { Icon(name: "pencil") }
                 }
               end
             end
@@ -59,9 +67,11 @@ Container {
         }
       else
         Segment(attached: true, data: { sortable_update_url: update_menu_setting_path(item) }) {
-          Icon(name: "braille", class: "drag-handle")
-          Icon(name: item.icon) if item.icon
+          Icon(name: "arrows alternate", class: "drag-handle")
+          text item.icon if item.icon
+          text " "
           text item.label
+          Link(href: edit_menu_setting_path(item), class: "edit-link") { Icon(name: "pencil") }
         }
       end
     end

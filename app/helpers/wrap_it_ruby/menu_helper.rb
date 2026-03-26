@@ -53,16 +53,20 @@ module WrapItRuby
     def render_menu_entry(entry, top_level: false)
       if entry['items']
         if top_level
-          MenuItem(dropdown: true, icon: entry['icon']) do
+          MenuItem(dropdown: true) do
+            text entry['icon'] if entry['icon']
+            text " "
             text entry['label']
-            concat tag.i(class: 'dropdown icon')
+            Icon(name: "dropdown")
             SubMenu do
               entry['items'].each { |child| render_menu_entry(child) }
             end
           end
         else
           MenuItem do
-            concat tag.i(class: 'dropdown icon')
+            Icon(name: "dropdown")
+            text entry['icon'] if entry['icon']
+            text " "
             text entry['label']
             SubMenu do
               entry['items'].each { |child| render_menu_entry(child) }
@@ -70,7 +74,11 @@ module WrapItRuby
           end
         end
       else
-        MenuItem(href: entry['route'], icon: entry['icon']) { text entry['label'] }
+        MenuItem(href: entry['route']) {
+          text entry['icon'] if entry['icon']
+          text " "
+          text entry['label']
+        }
       end
     end
 
@@ -81,7 +89,7 @@ module WrapItRuby
       unless database_menu_available?
         return tag.div { "No menu items. Configure MenuItem in your app or use config/menu.yml" }
       end
-      items = ::MenuItem.roots.includes(children: :children)
+      items = WrapItRuby::MenuItem.roots.includes(children: :children)
       nodes_json = menu_items_to_nodes(items).to_json
       sort_url = wrap_it_ruby.sort_menu_setting_path(id: 'bulk')
       edit_url_template = wrap_it_ruby.edit_menu_setting_path(id: ':id')
@@ -119,7 +127,7 @@ module WrapItRuby
     # Returns [label, value] pairs for all group items, suitable for
     # f.select in the new/edit forms.  Indents sub-groups to show hierarchy.
     def menu_group_options_for_select(items = nil, depth = 0)
-      items ||= ::MenuItem.groups.where(parent_id: nil).order(:position).includes(children: :children)
+      items ||= WrapItRuby::MenuItem.groups.where(parent_id: nil).order(:position).includes(children: :children)
       items.flat_map do |item|
         prefix = "\u00A0\u00A0" * depth + (depth > 0 ? "\u2514 " : '')
         opts = [ [ "#{prefix}#{item.label}", item.id ] ]
@@ -146,13 +154,13 @@ module WrapItRuby
     end
 
     def database_menu_available?
-      defined?(::MenuItem) && ::MenuItem.table_exists? && ::MenuItem.exists?
+      defined?(WrapItRuby::MenuItem) && WrapItRuby::MenuItem.table_exists? && WrapItRuby::MenuItem.exists?
     rescue StandardError
       false
     end
 
     def load_menu_from_database
-      ::MenuItem.roots.includes(children: :children).map { |item| item_to_hash(item) }
+      WrapItRuby::MenuItem.roots.includes(children: :children).map { |item| item_to_hash(item) }
     end
 
     def item_to_hash(item)

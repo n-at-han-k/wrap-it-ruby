@@ -26,4 +26,5 @@ Gem::Specification.new do |spec|
   spec.add_dependency "async-http"
   spec.add_dependency "async-websocket"
   spec.add_dependency "rails-active-ui"
+  spec.add_dependency "emoji-validator-rails"
 end

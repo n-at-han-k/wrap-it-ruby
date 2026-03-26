@@ -1,8 +1,8 @@
 # Add Menu Item
 
 Style('
-  form:has(select[name="item_type"] option[value="group"]:checked) .field:has([name="route"]),
-  form:has(select[name="item_type"] option[value="group"]:checked) .field:has([name="url"]) {
+  form:has(select[name="menu_item[item_type]"] option[value="group"]:checked) .field:has([name="menu_item[route]"]),
+  form:has(select[name="menu_item[item_type]"] option[value="group"]:checked) .field:has([name="menu_item[url]"]) {
     display: none;
   }
 ')
@@ -13,31 +13,31 @@ Container {
   }
 
   Segment {
-    Form(url: create_menu_setting_path, method: :post) {
+    Form(model: @menu_item, url: create_menu_setting_path, method: :post) {
       Grid(columns: 2) {
         Column {
-          Select(name: "item_type", label_text: "Type", options: [["Group", "group"], ["Proxy", "proxy"]])
+          Select(:item_type, [["Group", "group"], ["Link", "link"]], hint: "Group contains children, Link opens a website")
         }
         Column {
-          Select(name: "parent_id", label_text: "Parent", options: [["Root (top level)", ""]] + menu_group_options_for_select)
+          Select(:parent_id, [["No group (top level)", ""]] + menu_group_options_for_select, hint: "Which group this item belongs to")
         }
       }
 
       Grid(columns: 2) {
         Column {
-          TextField(name: "label", label: "Label", placeholder: "Menu item label")
+          TextField(:label, placeholder: "Menu item label", hint: "Display name in the menu")
         }
         Column {
-          TextField(name: "icon", label: "Icon", placeholder: "e.g. server")
+          EmojiField(:icon, hint: "Emoji shown next to the label")
         }
       }
 
       Grid(columns: 2) {
         Column {
-          TextField(name: "route", label: "Route", placeholder: "/path")
+          TextField(:route, placeholder: "/path", hint: "The URL to visit after clicking, e.g. #{request.base_url}/git")
         }
         Column {
-          TextField(name: "url", label: "URL", placeholder: "upstream.example.com")
+          TextField(:url, placeholder: "upstream.example.com", hint: "The web address for this website, e.g. github.com")
         }
       }
 
