@@ -3,24 +3,38 @@
 module WrapItRuby
   class MenuSettingsController < ::ApplicationController
     def index
-      @menu_items = ::MenuItem.roots.includes(children: :children)
+      @menu_items = menu_items_exist? ? ::MenuItem.roots.includes(children: :children) : []
+    end
+
+    def new
+      @menu_item = ::MenuItem.new
+    end
+
+    def edit
+      @menu_item = ::MenuItem.find(params[:id])
     end
 
     def create
       ::MenuItem.create!(menu_item_params)
-      respond_with_tree_refresh
+      redirect_to wrap_it_ruby.menu_settings_path
     end
 
     def update
       item = ::MenuItem.find(params[:id])
-      item.update!(menu_item_params)
-      respond_with_tree_refresh
+      position = params.dig(:menu_item, :position) || params[:position]
+      if position
+        item.insert_at(position.to_i)
+        head :no_content
+      else
+        item.update!(menu_item_params)
+        redirect_to wrap_it_ruby.menu_settings_path
+      end
     end
 
     def destroy
       item = ::MenuItem.find(params[:id])
       item.destroy!
-      respond_with_tree_refresh
+      redirect_to wrap_it_ruby.menu_settings_path
     end
 
     def sort
@@ -40,7 +54,7 @@ module WrapItRuby
         end
       end
 
-      respond_with_tree_refresh
+      redirect_to wrap_it_ruby.menu_settings_path
     end
 
     private
@@ -49,16 +63,10 @@ module WrapItRuby
       params.permit(:label, :icon, :route, :url, :item_type, :parent_id)
     end
 
-    def respond_with_tree_refresh
-      respond_to do |format|
-        format.turbo_stream do
-          render turbo_stream: turbo_stream.replace(
-            'menu-tree-container',
-            partial: 'wrap_it_ruby/menu_settings/tree'
-          )
-        end
-        format.html { head :no_content }
-      end
+    def menu_items_exist?
+      defined?(::MenuItem) && ::MenuItem.table_exists? && ::MenuItem.exists?
+    rescue StandardError
+      false
     end
   end
 end
