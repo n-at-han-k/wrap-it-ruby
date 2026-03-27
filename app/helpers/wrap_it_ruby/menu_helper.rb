@@ -35,7 +35,7 @@ module WrapItRuby
     end
 
     def all_proxy_menu_items
-      all_menu_items.select { |item| item['type'] == 'proxy' }
+      all_menu_items.select { |item| item['url'].present? }
     end
 
     # Returns browser paths (with leading /) for all proxy menu items.

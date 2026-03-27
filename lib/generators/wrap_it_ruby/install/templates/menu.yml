@@ -5,12 +5,10 @@
 # route: short name for the browser path (lowercase letters and dashes only, e.g. grafana)
 # url:   full URL of the upstream service (protocol is stripped automatically, e.g. https://grafana.example.com)
 #
-# type:
-#   proxy   - proxied service rendered inside an iframe
-#   link    - standard navigation within the app
+# If `url` is present, the menu item is proxied through `/_proxy/<url + path>`.
+# If `url` is blank, the item is a normal in-app navigation link.
 
 - label: Example
   route: example
   url: example.com
   icon: globe
-  type: proxy

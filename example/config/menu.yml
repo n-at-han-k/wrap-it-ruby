@@ -4,10 +4,8 @@
   route: ebay
   url: ebay.co.uk
   icon: globe
-  type: proxy
 
 - label: Github
   route: github
   url: github.com
   icon: globe
-  type: proxy
