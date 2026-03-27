@@ -16,27 +16,24 @@ module WrapItRuby
     class ProxyMiddleware
       PATTERN = %r{\A/_proxy/(?<host>[^/]+)(?<path>/.*)?\z}
 
-      # ── Request headers whitelisted for forwarding to upstream ──
+      # ── Request headers blocked from forwarding to upstream ──
       #
-      # Everything not on this list is dropped. This prevents leaking
-      # proxy-internal headers, browser metadata, and hop-by-hop headers.
+      # Everything not on this list is forwarded. This keeps browser/client
+      # headers intact while still stripping hop-by-hop and proxy-internal
+      # headers that can break upstream requests.
       #
-      REQUEST_WHITELIST = %w[
-        accept
-        accept-language
-        authorization
-        cache-control
-        content-type
-        cookie
-        if-match
-        if-modified-since
-        if-none-match
-        if-range
-        if-unmodified-since
-        pragma
-        range
-        user-agent
-        x-requested-with
+      REQUEST_BLOCKLIST = %w[
+        connection
+        keep-alive
+        proxy-authenticate
+        proxy-authorization
+        te
+        trailers
+        transfer-encoding
+        upgrade
+        host
+        content-length
+        x-proxy-host
       ].to_set.freeze
 
       # ── Response headers whitelisted for forwarding to browser ──
@@ -72,6 +69,7 @@ module WrapItRuby
         @clients      = {}
         @proxy_host   = ENV['WRAP_IT_PROXY_HOST']
         @cookie_domain = ENV.fetch('WRAP_IT_COOKIE_DOMAIN', '.cia.net')
+        @max_cookie_bytes = Integer(ENV.fetch('WRAP_IT_MAX_COOKIE_HEADER_BYTES', '4096'))
       end
 
       def call(env)
@@ -119,7 +117,7 @@ module WrapItRuby
         end
 
         rack_headers = build_response_headers(response.headers, host)
-        [response.status, rack_headers, rack_body]
+        [ response.status, rack_headers, rack_body ]
       end
 
       # ── WebSocket (safety net — handled by WebSocketProxy before Rack) ──
@@ -130,7 +128,7 @@ module WrapItRuby
       end
 
       def proxy_websocket(_env, _host, _path)
-        [502, { 'content-type' => 'text/plain' }, ['WebSocket requests must be handled at Protocol::HTTP level']]
+        [ 502, { 'content-type' => 'text/plain' }, [ 'WebSocket requests must be handled at Protocol::HTTP level' ] ]
       end
 
       # ── Request headers: whitelist → modify → add ──
@@ -138,14 +136,24 @@ module WrapItRuby
       def build_request_headers(env, host)
         headers = Protocol::HTTP::Headers.new
 
-        # 1. Whitelist: only forward known-safe headers
+        # 1. Forward all incoming headers except blocked ones.
         env.each do |key, value|
           next unless key.start_with?('HTTP_')
 
           name = key.delete_prefix('HTTP_').downcase.tr('_', '-')
-          next unless REQUEST_WHITELIST.include?(name)
+          next if REQUEST_BLOCKLIST.include?(name)
+          next if name == 'cookie'
 
           headers.add(name, value)
+        end
+
+        cookie = env['HTTP_COOKIE']
+        if cookie && !cookie.empty?
+          if cookie.bytesize <= @max_cookie_bytes
+            headers.add('cookie', cookie)
+          else
+            $stderr.puts("[proxy] dropping oversized cookie header (#{cookie.bytesize} bytes > #{@max_cookie_bytes})")
+          end
         end
 
         # Forward content-type from Rack env (Rack stores it without HTTP_ prefix)
@@ -153,11 +161,15 @@ module WrapItRuby
         # automatically from the body, and duplicates cause nginx to return 400.
         headers.add('content-type', env['CONTENT_TYPE']) if env['CONTENT_TYPE']
 
-        # 2. Modify: nothing to modify at this stage (cookies pass through
-        #    as-is since the .cia.net domain covers both proxy and upstream)
+        # 2. Modify: rewrite origin to upstream origin when present.
+        if headers['origin']
+          headers.delete('origin')
+          headers.add('origin', "https://#{host}")
+        end
 
-        # 3. Add: set host for the upstream
-        headers.add('host', host)
+        # 3. Add: no explicit host header.
+        # Async::HTTP::Client writes Host from request authority; adding one
+        # here can produce duplicate Host headers on HTTP/1.1 and trigger 400.
 
         headers
       end
@@ -175,7 +187,7 @@ module WrapItRuby
           # 2. Modify: rewrite specific headers
           case key
           when 'set-cookie'
-            value = rewrite_cookie_domain(value)
+            value = rewrite_cookie_scope(value, host)
           when 'location'
             # Handled below after the loop
           end
@@ -193,7 +205,12 @@ module WrapItRuby
 
       def client_for(host)
         @clients[host] ||= Async::HTTP::Client.new(
-          Async::HTTP::Endpoint.parse("https://#{host}"),
+          # Some upstreams (often behind Traefik) advertise HTTP/2 but close
+          # streams unexpectedly for proxied requests. Force HTTP/1.1 ALPN to
+          # avoid HTTP2::StreamError("Stream closed!") during response reads.
+          Async::HTTP::Endpoint.parse("https://#{host}",
+            alpn_protocols: Async::HTTP::Protocol::HTTP11.names
+          ),
           retries: 0
         )
       end
@@ -230,9 +247,22 @@ module WrapItRuby
         end
       end
 
-      # Rewrites Set-Cookie Domain to the configured cookie domain.
-      def rewrite_cookie_domain(cookie)
-        cookie.gsub(/Domain=[^;]+/i, "Domain=#{@cookie_domain}")
+      # Rewrites Set-Cookie Domain to the configured proxy cookie domain and
+      # scopes cookie Path to the proxied host prefix to prevent cross-upstream
+      # cookie leakage (and oversized Cookie headers on unrelated upstreams).
+      def rewrite_cookie_scope(cookie, host)
+        rewritten = if cookie.match?(/Domain=/i)
+          cookie.gsub(/Domain=[^;]+/i, "Domain=#{@cookie_domain}")
+        else
+          "#{cookie}; Domain=#{@cookie_domain}"
+        end
+
+        proxy_path = "/_proxy/#{host}/"
+        if rewritten.match?(/Path=/i)
+          rewritten.gsub(/Path=[^;]*/i, "Path=#{proxy_path}")
+        else
+          "#{rewritten}; Path=#{proxy_path}"
+        end
       end
 
       def read_body(env)
