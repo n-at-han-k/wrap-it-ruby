@@ -7,12 +7,11 @@ module WrapItRuby
 
     def show
       get_menu_item.then do |menu_item|
-        target_path   = request.path.delete_prefix(menu_item["route"])
-        target_domain = menu_item["url"]
-
-        target_url  = "#{target_domain}/#{target_path}"
-        proxy_host  = ENV["WRAP_IT_PROXY_HOST"]
-        @iframe_src = proxy_host ? "//#{proxy_host}/_proxy/#{target_url}" : "/_proxy/#{target_url}"
+        remaining     = request.path.delete_prefix("/#{menu_item['route']}")
+        upstream_host = extract_upstream_host(menu_item["url"])
+        target_url    = "#{upstream_host}#{remaining}"
+        proxy_host    = ENV["WRAP_IT_PROXY_HOST"]
+        @iframe_src   = proxy_host ? "//#{proxy_host}/_proxy/#{target_url}" : "/_proxy/#{target_url}"
       end
     end
 
@@ -20,7 +19,15 @@ module WrapItRuby
 
       def get_menu_item
         path = request.path
-        all_proxy_menu_items.find { |item| path.start_with?(item["route"]) }
+        all_proxy_menu_items.find { |item| proxy_route_match?(path, item["route"]) }
+      end
+
+      # Extract just the host from a stored url (protocol already stripped).
+      # e.g. "github.com/nathank/repo" → "github.com"
+      def extract_upstream_host(url)
+        URI.parse("https://#{url}").host
+      rescue URI::InvalidURIError
+        url.to_s.split("/").first
       end
   end
 end

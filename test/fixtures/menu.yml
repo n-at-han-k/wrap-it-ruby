@@ -1,17 +1,14 @@
 - label: Dashboard
-  route: /dashboard
+  route: dashboard
   url: dashboard.example.com
   icon: chart
   type: proxy
 
 - label: Docs
-  route: /docs
-  url: docs.example.com
   icon: book
-  type: proxy
   items:
     - label: API
-      route: /docs/api
+      route: api
       url: api.example.com
       icon: code
       type: proxy
@@ -19,12 +16,12 @@
     - label: Guides
       items:
         - label: Getting Started
-          route: /docs/guides/start
+          route: getting-started
           url: guides.example.com
           icon: play
           type: proxy
 
 - label: About
-  route: /about
+  route: about
   icon: info
   type: link

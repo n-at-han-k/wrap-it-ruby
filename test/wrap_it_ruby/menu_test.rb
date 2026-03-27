@@ -47,16 +47,50 @@ class WrapItRuby::MenuHelperTest < Minitest::Test
     proxy_items.each do |item|
       assert_equal 'proxy', item['type']
     end
-    assert_equal 4, proxy_items.size
+    assert_equal 3, proxy_items.size
   end
 
-  def test_proxy_paths_returns_routes
+  def test_proxy_paths_returns_routes_with_leading_slash
     paths = WrapItRuby::MenuHelper.proxy_paths
     assert_includes paths, '/dashboard'
-    assert_includes paths, '/docs'
-    assert_includes paths, '/docs/api'
-    assert_includes paths, '/docs/guides/start'
+    assert_includes paths, '/api'
+    assert_includes paths, '/getting-started'
     refute_includes paths, '/about'
+  end
+
+  def test_proxy_route_match_exact_segment
+    assert WrapItRuby::MenuHelper.proxy_route_match?("/github", "github")
+    assert WrapItRuby::MenuHelper.proxy_route_match?("/github/foo/bar", "github")
+    refute WrapItRuby::MenuHelper.proxy_route_match?("/github-actions", "github")
+    refute WrapItRuby::MenuHelper.proxy_route_match?("/git", "github")
+  end
+
+  def test_proxy_route_checks_all_items
+    assert WrapItRuby::MenuHelper.proxy_route?("/dashboard")
+    assert WrapItRuby::MenuHelper.proxy_route?("/dashboard/some/path")
+    assert WrapItRuby::MenuHelper.proxy_route?("/api")
+    refute WrapItRuby::MenuHelper.proxy_route?("/about")
+    refute WrapItRuby::MenuHelper.proxy_route?("/unknown")
+  end
+
+  def test_menu_href_with_url_containing_path
+    entry = { 'route' => 'github', 'url' => 'github.com/nathank/repo' }
+    assert_equal '/github/nathank/repo', WrapItRuby::MenuHelper.menu_href(entry)
+  end
+
+  def test_menu_href_with_url_domain_only
+    entry = { 'route' => 'ebay', 'url' => 'ebay.co.uk' }
+    assert_equal '/ebay', WrapItRuby::MenuHelper.menu_href(entry)
+  end
+
+  def test_menu_href_without_url
+    entry = { 'route' => 'about' }
+    assert_equal '/about', WrapItRuby::MenuHelper.menu_href(entry)
+  end
+
+  def test_menu_href_with_blank_route
+    entry = { 'route' => nil }
+    assert_nil WrapItRuby::MenuHelper.menu_href(entry)
   end
 
   def test_menu_is_includable

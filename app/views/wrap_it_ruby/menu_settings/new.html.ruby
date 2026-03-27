@@ -34,10 +34,10 @@ Container {
 
       Grid(columns: 2) {
         Column {
-          TextField(:route, placeholder: "/path", hint: "The URL to visit after clicking, e.g. #{request.base_url}/git")
+          TextField(:route, placeholder: "github", hint: "Short name (lowercase letters and dashes only), e.g. github")
         }
         Column {
-          TextField(:url, placeholder: "upstream.example.com", hint: "The web address for this website, e.g. github.com")
+          TextField(:url, placeholder: "https://github.com/path", hint: "Full URL of the website to proxy, e.g. https://github.com")
         }
       }
 

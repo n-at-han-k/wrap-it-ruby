@@ -2,15 +2,15 @@
 #
 # Menu configuration for WrapItRuby.
 #
-# route: local path in this app (e.g. /grafana)
-# url:   upstream host to proxy (e.g. grafana.example.com)
+# route: short name for the browser path (lowercase letters and dashes only, e.g. grafana)
+# url:   full URL of the upstream service (protocol is stripped automatically, e.g. https://grafana.example.com)
 #
 # type:
 #   proxy   - proxied service rendered inside an iframe
 #   link    - standard navigation within the app
 
 - label: Example
-  route: /example
+  route: example
   url: example.com
   icon: globe
   type: proxy

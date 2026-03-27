@@ -1,13 +1,13 @@
 # Example menu configuration for wrap-it-ruby demo.
 
 - label: Ebay
-  route: /ebay
+  route: ebay
   url: ebay.co.uk
   icon: globe
   type: proxy
 
 - label: Github
-  route: /github
+  route: github
   url: github.com
   icon: globe
   type: proxy

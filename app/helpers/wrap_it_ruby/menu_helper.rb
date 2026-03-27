@@ -38,10 +38,44 @@ module WrapItRuby
       all_menu_items.select { |item| item['type'] == 'proxy' }
     end
 
+    # Returns browser paths (with leading /) for all proxy menu items.
+    # Used by the route constraint to decide which requests hit ProxyController.
     def proxy_paths
-      all_menu_items
-        .select { |item| item['type'] == 'proxy' }
-        .map    { |item| item['route'] }
+      all_proxy_menu_items.map { |item| "/#{item['route']}" }
+    end
+
+    # Build the full href for a menu entry.
+    #
+    # The route is a bare slug (e.g. "github") and url may contain a path
+    # (e.g. "github.com/nathank/repo"). The href combines them:
+    #   route "github" + url "github.com/nathank/repo" → "/github/nathank/repo"
+    #   route "ebay"   + url "ebay.co.uk"              → "/ebay"
+    #   route "about"  + url nil                        → "/about"
+    def menu_href(entry)
+      route = entry['route']
+      return nil if route.blank?
+
+      url = entry['url']
+      if url.present?
+        uri_path = URI.parse("https://#{url}").path.to_s
+        "/#{route}#{uri_path}"
+      else
+        "/#{route}"
+      end
+    rescue URI::InvalidURIError
+      "/#{route}"
+    end
+
+    # Check whether a request path matches a proxy menu item's route.
+    # Matches on exact first segment to prevent "git" matching "/github/...".
+    def proxy_route_match?(request_path, route)
+      request_path.match?(%r{\A/#{Regexp.escape(route)}(/|\z)})
+    end
+
+    # Returns true if the request path matches any proxy menu item route.
+    # Used by the route constraint in config/routes.rb.
+    def proxy_route?(request_path)
+      all_proxy_menu_items.any? { |item| proxy_route_match?(request_path, item['route']) }
     end
 
     def reset_menu_cache!; end
@@ -74,7 +108,7 @@ module WrapItRuby
           end
         end
       else
-        MenuItem(href: entry['route']) {
+        MenuItem(href: menu_href(entry)) {
           text entry['icon'] if entry['icon']
           text " "
           text entry['label']

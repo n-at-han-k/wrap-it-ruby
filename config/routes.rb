@@ -10,6 +10,6 @@ WrapItRuby::Engine.routes.draw do
   delete 'menu/settings/:id',      to: 'menu_settings#destroy', as: :destroy_menu_setting
 
   get '/*path', to: 'proxy#show', constraints: lambda { |req|
-    WrapItRuby::MenuHelper.proxy_paths.any? { |p| req.path.start_with?(p) }
+    WrapItRuby::MenuHelper.proxy_route?(req.path)
   }
 end
