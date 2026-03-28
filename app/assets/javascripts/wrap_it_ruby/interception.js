@@ -12,8 +12,6 @@
 
   var PROXY_BASE = '/_proxy';
 
-  console.log('[interception]', 'loaded');
-
   // Block service worker registration — proxied apps share the proxy
   // origin so a SW registered by one app (e.g. code-server) would
   // intercept requests for all proxied sites with stale cached paths.
@@ -30,13 +28,49 @@
   var _EventSource  = window.EventSource;
 
   const PROXY_HOST = window.__proxyHost;
+  const NAV_MESSAGE_TYPE = 'wrap-it-ruby:navigation'
+
+  const SPECIAL_SCHEME = /^(javascript:|mailto:|tel:|data:|blob:)/i
+
+  const isHashOnly = (url) => typeof url === 'string' && url.startsWith('#')
+
+  const normalizeProxiedPath = (path) => {
+    if (typeof path !== 'string') return path
+    const prefix = `/_proxy/${PROXY_HOST}`
+    let normalized = path
+    while (normalized.startsWith(`${prefix}${prefix}`)) {
+      normalized = `${prefix}${normalized.slice(prefix.length * 2)}`
+    }
+    return normalized
+  }
+
+  const currentIframePath = () => `${window.location.pathname}${window.location.search}${window.location.hash}`
+
+  const notifyParentNavigation = () => {
+    if (!window.parent || window.parent === window) return
+    try {
+      window.parent.postMessage({ type: NAV_MESSAGE_TYPE, iframePath: currentIframePath() }, '*')
+    } catch (_) {
+      // ignore
+    }
+  }
 
   const rewriteUrl = (url) => {
     if (typeof url !== 'string') return url
+    if (!url || isHashOnly(url) || SPECIAL_SCHEME.test(url)) return url
+    if (url.startsWith('/_proxy/')) return normalizeProxiedPath(url)
+    if (url.startsWith('/')) return normalizeProxiedPath(`/_proxy/${PROXY_HOST}${url}`)
     try {
-      const parsed = new URL(url)
+      const parsed = new URL(url, window.location.href)
+      const proxiedPath = normalizeProxiedPath(`/_proxy/${parsed.host}${parsed.pathname}${parsed.search}${parsed.hash}`)
+
+      if (parsed.pathname.startsWith('/_proxy/')) {
+        return normalizeProxiedPath(`${parsed.pathname}${parsed.search}${parsed.hash}`)
+      }
+
       if (parsed.host === window.__hostingSite) return url
-      return `/_proxy/${parsed.host}${parsed.pathname}${parsed.search}${parsed.hash}`
+
+      return proxiedPath
     } catch {
       return url
     }
@@ -48,26 +82,52 @@
     const link = event.target.closest('a')
     if (!link) return
 
+    if (event.defaultPrevented) return
+    if (event.button !== 0) return
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    if (link.target && link.target !== '_self') return
+    if (link.hasAttribute('download')) return
+
     const raw = link.getAttribute('href')
-    const url = raw.startsWith('/_proxy/') ? raw
-      : raw.startsWith('/') ? `/_proxy/${window.__proxyHost}${raw}`
-      : rewriteUrl(raw)
+    if (!raw || isHashOnly(raw) || SPECIAL_SCHEME.test(raw)) return
+
+    const url = rewriteUrl(raw)
+    if (!url || url === raw) return
 
     event.preventDefault()
     window.location.href = url
   }, true)
 
   document.addEventListener('submit', (event) => {
-    event.preventDefault()
     const form = event.target
-    const raw = form.getAttribute('action') || ''
-    const url = raw.startsWith('/_proxy/') ? raw
-      : raw.startsWith('/') ? `/_proxy/${window.__proxyHost}${raw}`
-      : rewriteUrl(raw)
+    if (!(form instanceof HTMLFormElement)) return
 
+    const raw = form.getAttribute('action') || ''
+    const url = rewriteUrl(raw)
+
+    if (!url || url === raw) return
+
+    event.preventDefault()
     form.setAttribute('action', url)
     event.target.submit()
   }, true)
+
+  const _pushState = history.pushState
+  const _replaceState = history.replaceState
+  history.pushState = function (...args) {
+    const result = _pushState.apply(this, args)
+    notifyParentNavigation()
+    return result
+  }
+  history.replaceState = function (...args) {
+    const result = _replaceState.apply(this, args)
+    notifyParentNavigation()
+    return result
+  }
+
+  window.addEventListener('popstate', notifyParentNavigation)
+  window.addEventListener('hashchange', notifyParentNavigation)
+  window.addEventListener('load', notifyParentNavigation)
 
   //document.addEventListener('submit', (event) => {
   //  event.preventDefault()
@@ -121,7 +181,7 @@
     if (newInit.body instanceof ReadableStream) newInit.duplex = 'half'
 
     return _fetch.call(window, rewriteUrl(url), newInit).catch((err) => {
-      console.warn('Proxied fetch failed, retrying without modifications:', err)
+      if (err && err.name === 'AbortError') throw err
       return _fetch.call(window, input, init)
     })
   }
@@ -174,7 +234,6 @@
 
   window.WebSocket = function (url, protocols) {
     const rewritten = rewriteWsUrl(url)
-    console.log('[interception] WebSocket', url, '->', rewritten)
     if (protocols !== undefined) return new _WebSocket(rewritten, protocols)
     return new _WebSocket(rewritten)
   }

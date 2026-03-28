@@ -12,6 +12,8 @@ module WrapItRuby
         target_url    = "#{upstream_host}#{remaining}"
         proxy_host    = ENV["WRAP_IT_PROXY_HOST"]
         @iframe_src   = proxy_host ? "//#{proxy_host}/_proxy/#{target_url}" : "/_proxy/#{target_url}"
+        @current_route = menu_item["route"]
+        @upstream_host = upstream_host
       end
     end
 

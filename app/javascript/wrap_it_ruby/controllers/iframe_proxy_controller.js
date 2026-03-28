@@ -36,6 +36,7 @@ export default class extends Controller {
 
     this.element.addEventListener("load", this.onLoad)
     window.addEventListener("popstate", this.onPopstate)
+    window.addEventListener("message", this.onMessage)
   }
 
   disconnect() {
@@ -45,13 +46,13 @@ export default class extends Controller {
 
     this.element.removeEventListener("load", this.onLoad)
     window.removeEventListener("popstate", this.onPopstate)
+    window.removeEventListener("message", this.onMessage)
   }
 
   onLoad = () => {
-    const { pathname, search } = this.element.contentWindow.location
-    if (pathname === "about:blank") return
+    const iframePath = this.#currentIframePath()
+    if (!iframePath || iframePath === "about:blank") return
 
-    const iframePath = pathname + search
     const breakout = this.#detectBreakout(iframePath)
 
     if (breakout) {
@@ -65,6 +66,24 @@ export default class extends Controller {
   onPopstate = (event) => {
     const src = event.state?.iframeSrc
     if (src) this.element.contentWindow.location.replace(src)
+  }
+
+  onMessage = (event) => {
+    if (event.source !== this.element.contentWindow) return
+
+    const data = event.data
+    if (!data || data.type !== "wrap-it-ruby:navigation") return
+
+    const iframePath = data.iframePath
+    if (typeof iframePath !== "string" || !iframePath.startsWith("/_proxy/")) return
+
+    const breakout = this.#detectBreakout(iframePath)
+    if (breakout) {
+      Turbo.visit(breakout, { action: "advance" })
+      return
+    }
+
+    this.#syncHistory(iframePath)
   }
 
   // ---- private ----
@@ -94,8 +113,17 @@ export default class extends Controller {
 
     const browserPath = `/${this.currentValue}${subPath}`
 
-    if (browserPath !== window.location.pathname + window.location.search) {
+    if (browserPath !== window.location.pathname + window.location.search + window.location.hash) {
       history.pushState({ iframeSrc: iframePath }, "", browserPath)
+    }
+  }
+
+  #currentIframePath() {
+    try {
+      const { pathname, search, hash } = this.element.contentWindow.location
+      return pathname + search + hash
+    } catch (_) {
+      return null
     }
   }
 

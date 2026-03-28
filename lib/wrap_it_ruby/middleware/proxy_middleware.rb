@@ -94,19 +94,28 @@ module WrapItRuby
       # ── HTTP proxying ──
 
       def proxy_http(env, host, path)
-        client = client_for(host)
-
         query     = env['QUERY_STRING']
         query     = deproxify_query(query) if query && !query.empty?
         full_path = (query && !query.empty?) ? "#{path}?#{query}" : path
         headers   = build_request_headers(env, host)
         body      = read_body(env)
+        method    = env['REQUEST_METHOD']
 
-        request = Protocol::HTTP::Request.new(
-          'https', host, env['REQUEST_METHOD'], full_path, nil, headers, body
-        )
+        retried = false
 
-        response = client.call(request)
+        begin
+          request = Protocol::HTTP::Request.new(
+            'https', host, method, full_path, nil, headers, body
+          )
+
+          response = client_for(host).call(request)
+        rescue EOFError, Errno::ECONNRESET, Errno::EPIPE
+          raise unless !retried && retryable_method?(method)
+
+          retried = true
+          reset_client_for(host)
+          retry
+        end
 
         rack_body = Enumerator.new do |y|
           while (chunk = response.body&.read)
@@ -215,6 +224,17 @@ module WrapItRuby
         )
       end
 
+      def reset_client_for(host)
+        client = @clients.delete(host)
+        client&.close
+      rescue StandardError
+        nil
+      end
+
+      def retryable_method?(method)
+        method == 'GET' || method == 'HEAD'
+      end
+
       # Rewrites proxy URLs in query parameter values back to real upstream
       # URLs. Fixes auth flows where upstream validates return_url against
       # its own host.
@@ -235,11 +255,17 @@ module WrapItRuby
           result_key = result.key?('location') ? 'location' : 'Location'
           begin
             uri = URI.parse(location)
-            if uri.host
+            if uri.path&.start_with?('/_proxy/')
+              result[result_key] = "#{uri.path}#{"?#{uri.query}" if uri.query}"
+            elsif uri.host
               result[result_key] = "/_proxy/#{uri.host.delete_suffix('.')}#{uri.path}#{"?#{uri.query}" if uri.query}"
             else
               resolved = URI.join("https://#{host}/", location)
-              result[result_key] = "/_proxy/#{host}#{resolved.path}#{"?#{resolved.query}" if resolved.query}"
+              if resolved.path.start_with?('/_proxy/')
+                result[result_key] = "#{resolved.path}#{"?#{resolved.query}" if resolved.query}"
+              else
+                result[result_key] = "/_proxy/#{host}#{resolved.path}#{"?#{resolved.query}" if resolved.query}"
+              end
             end
           rescue URI::InvalidURIError
             # leave it alone
