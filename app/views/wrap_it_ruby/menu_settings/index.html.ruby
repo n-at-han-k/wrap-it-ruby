@@ -83,4 +83,7 @@ Container {
     Icon(name: "plus")
     text " Add Item"
   }
+  Button(href: export_menu_settings_path) {
+    text "export menu"
+  }
 }
