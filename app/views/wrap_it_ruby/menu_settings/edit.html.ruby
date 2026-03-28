@@ -49,6 +49,7 @@ Container {
         text " Save"
       }
       Button(href: menu_settings_path) { text "Cancel" }
+      Button(href: export_menu_settings_path) { text "export menu" }
     }
   }
 

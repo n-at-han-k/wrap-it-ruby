@@ -14,6 +14,15 @@ module WrapItRuby
       @menu_item = MenuItem.find(params[:id])
     end
 
+    def export
+      send_data(
+        exported_menu_yaml,
+        type: "text/yaml; charset=utf-8",
+        disposition: "inline",
+        filename: "menu.yaml"
+      )
+    end
+
     def create
       MenuItem.create!(menu_item_params)
       redirect_to wrap_it_ruby.menu_settings_path
@@ -67,6 +76,33 @@ module WrapItRuby
       defined?(MenuItem) && MenuItem.table_exists? && MenuItem.exists?
     rescue StandardError
       false
+    end
+
+    def exported_menu_yaml
+      return File.read(menu_file_path) if menu_file_path.exist? && !menu_items_exist?
+
+      menu_items = menu_items_exist? ? MenuItem.roots.includes(children: :children) : []
+      menu_items.map { |item| export_item(item) }.to_yaml
+    end
+
+    def export_item(item)
+      payload = { "label" => item.label }
+
+      if item.group?
+        payload["icon"] = item.icon if item.icon.present?
+        payload["items"] = item.children.order(:position).map { |child| export_item(child) }
+      else
+        payload["route"] = item.route if item.route.present?
+        payload["url"] = item.url if item.url.present?
+        payload["icon"] = item.icon if item.icon.present?
+        payload["type"] = item.item_type
+      end
+
+      payload
+    end
+
+    def menu_file_path
+      Rails.root.join("config/menu.yml")
     end
   end
 end
