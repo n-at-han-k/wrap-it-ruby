@@ -2,6 +2,7 @@
 
 Style('
   form:has(select[name="menu_item[item_type]"] option[value="group"]:checked) .field:has([name="menu_item[route]"]),
+  form:has(select[name="menu_item[item_type]"] option[value="external"]:checked) .field:has([name="menu_item[route]"]),
   form:has(select[name="menu_item[item_type]"] option[value="group"]:checked) .field:has([name="menu_item[url]"]) {
     display: none;
   }
@@ -16,7 +17,7 @@ Container {
     Form(model: @menu_item, url: create_menu_setting_path, method: :post) {
       Grid(columns: 2) {
         Column {
-          Select(:item_type, [["Group", "group"], ["Link", "link"]], hint: "Group contains children, Link opens a website")
+          Select(:item_type, [["Group", "group"], ["Internal", "internal"], ["External", "external"]], hint: "Group contains children, Internal opens in app, External opens a new tab")
         }
         Column {
           Select(:parent_id, [["No group (top level)", ""]] + menu_group_options_for_select, hint: "Which group this item belongs to")

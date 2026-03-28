@@ -35,7 +35,7 @@ module WrapItRuby
     end
 
     def all_proxy_menu_items
-      all_menu_items.select { |item| item['url'].present? }
+      all_menu_items.select { |item| item['url'].present? && menu_item_type(item) == 'internal' }
     end
 
     # Returns browser paths (with leading /) for all proxy menu items.
@@ -52,6 +52,14 @@ module WrapItRuby
     #   route "ebay"   + url "ebay.co.uk"              → "/ebay"
     #   route "about"  + url nil                        → "/about"
     def menu_href(entry)
+      type = menu_item_type(entry)
+
+      if type == 'external'
+        url = entry['url']
+        return nil if url.blank?
+        return "https://#{url}"
+      end
+
       route = entry['route']
       return nil if route.blank?
 
@@ -108,7 +116,13 @@ module WrapItRuby
           end
         end
       else
-        MenuItem(href: menu_href(entry)) {
+        item_attrs = { href: menu_href(entry) }
+        if menu_item_type(entry) == 'external'
+          item_attrs[:target] = '_blank'
+          item_attrs[:rel] = 'noopener noreferrer'
+        end
+
+        MenuItem(**item_attrs) {
           text entry['icon'] if entry['icon']
           text " "
           text entry['label']
@@ -209,6 +223,17 @@ module WrapItRuby
       end
 
       hash
+    end
+
+    def menu_item_type(entry)
+      case entry['type'].to_s
+      when 'group' then 'group'
+      when 'external' then 'external'
+      when 'internal', 'link', 'proxy', ''
+        'internal'
+      else
+        'internal'
+      end
     end
   end
 end

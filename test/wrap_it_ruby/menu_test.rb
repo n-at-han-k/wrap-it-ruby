@@ -44,10 +44,13 @@ class WrapItRuby::MenuHelperTest < Minitest::Test
 
   def test_all_proxy_menu_items_filters_by_type
     proxy_items = WrapItRuby::MenuHelper.all_proxy_menu_items
-    proxy_items.each do |item|
-      assert_equal 'proxy', item['type']
-    end
     assert_equal 3, proxy_items.size
+  end
+
+  def test_menu_item_type_classification
+    assert_equal 'external', WrapItRuby::MenuHelper.send(:menu_item_type, { 'type' => 'external', 'url' => 'example.com' })
+    assert_equal 'internal', WrapItRuby::MenuHelper.send(:menu_item_type, { 'type' => 'proxy', 'url' => 'api.example.com' })
+    assert_equal 'internal', WrapItRuby::MenuHelper.send(:menu_item_type, { 'type' => 'link', 'route' => 'about' })
   end
 
   def test_proxy_paths_returns_routes_with_leading_slash
@@ -86,6 +89,11 @@ class WrapItRuby::MenuHelperTest < Minitest::Test
   def test_menu_href_without_url
     entry = { 'route' => 'about' }
     assert_equal '/about', WrapItRuby::MenuHelper.menu_href(entry)
+  end
+
+  def test_menu_href_external_link
+    entry = { 'type' => 'external', 'url' => 'example.com/path' }
+    assert_equal 'https://example.com/path', WrapItRuby::MenuHelper.menu_href(entry)
   end
 
   def test_menu_href_with_blank_route

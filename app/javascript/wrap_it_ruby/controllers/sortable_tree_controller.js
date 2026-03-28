@@ -39,8 +39,8 @@ export default class extends Controller {
       renderLabel: (data) => {
         const icon = data.icon ? `<i class="${data.icon} icon"></i> ` : ""
         const route = data.route ? `<span class="st-route">${data.route}</span>` : ""
-        const typeBadge = data.item_type === "group"
-          ? '<span class="ui mini label">group</span> '
+        const typeBadge = data.item_type
+          ? `<span class="ui mini label">${data.item_type}</span> `
           : ""
         return `<span class="st-label-inner">${icon}${typeBadge}<strong>${data.title}</strong>${route}</span>`
       },

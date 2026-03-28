@@ -4,18 +4,23 @@ module WrapItRuby
   class MenuItem < ApplicationRecord
     self.table_name = "menu_items"
 
+    TYPES = %w[group internal external].freeze
+
     acts_as_tree order: "position"
     acts_as_list scope: :parent
 
     scope :roots, -> { where(parent_id: nil).order(:position) }
     scope :groups, -> { where(item_type: "group") }
-    scope :links, -> { where(item_type: "link") }
+    scope :internals, -> { where(item_type: "internal") }
+    scope :externals, -> { where(item_type: "external") }
 
     before_validation :normalize_route
     before_validation :normalize_url
+    before_validation :normalize_item_type
 
     validates :label, presence: true
     validates :icon, emoji: { allow_blank: true }
+    validates :item_type, inclusion: { in: TYPES }
     validates :route, format: { with: /\A[a-z]([a-z-]*[a-z])?\z/,
                                 message: "only lowercase letters and dashes allowed" },
                       uniqueness: { allow_blank: true },
@@ -27,7 +32,9 @@ module WrapItRuby
     after_commit :reset_menu_cache
 
     def group?  = item_type == "group"
-    def link?   = item_type == "link"
+    def internal? = item_type == "internal"
+    def external? = item_type == "external"
+    def link? = internal? || external?
 
     # Extract the host portion from the stored url (which has no protocol).
     # e.g. "github.com/nathank/repo" → "github.com"
@@ -86,7 +93,7 @@ module WrapItRuby
         icon:      hash["icon"],
         route:     hash["route"],
         url:       hash["url"],
-        item_type: hash["items"] ? "group" : (hash["type"] || "link"),
+        item_type: hash["items"] ? "group" : normalize_entry_type(hash["type"]),
         parent_id: parent&.id,
         position:  position
       )
@@ -99,6 +106,17 @@ module WrapItRuby
     end
 
     private
+
+    def self.normalize_entry_type(type)
+      case type.to_s
+      when "group" then "group"
+      when "external" then "external"
+      when "internal", "link", "proxy", ""
+        "internal"
+      else
+        "internal"
+      end
+    end
 
     # Normalize route to kebab-case: "MyPage" → "my-page", "/Some_Path" → "some-path"
     def normalize_route
@@ -119,6 +137,10 @@ module WrapItRuby
       self.url = url.to_s
                     .sub(%r{\Ahttps?://}, "")      # strip protocol
                     .chomp("/")                    # strip trailing slash
+    end
+
+    def normalize_item_type
+      self.item_type = self.class.normalize_entry_type(item_type)
     end
 
     def reset_menu_cache

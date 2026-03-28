@@ -35,12 +35,7 @@ output_buffer << turbo_frame_tag("proxy-content") do
   tag.div(class: 'iframe-wrapper') do
     tag.iframe(
       src: @iframe_src,
-      allow: iframe_allow,
-      data: {
-        controller: "wrap-it-ruby--iframe-proxy",
-        "wrap-it-ruby--iframe-proxy-current-value": @current_route,
-        "wrap-it-ruby--iframe-proxy-host-value": @upstream_host
-      }
+      allow: iframe_allow
     )
   end
 end
